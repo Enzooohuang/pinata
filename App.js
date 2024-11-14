@@ -12,6 +12,7 @@ import { useFonts } from 'expo-font';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
+import * as StoreReview from 'expo-store-review';
 
 const Stack = createNativeStackNavigator();
 const screenWidth = Dimensions.get('window').width;
@@ -957,6 +958,17 @@ function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLo
     await WebBrowser.openBrowserAsync('https://forms.gle/JfXFTZomAyEMRCis8');
   };
 
+  const handleStoreReview = async () => {
+    try {
+      const isAvailable = await StoreReview.isAvailableAsync();
+      if (isAvailable) {
+        await StoreReview.requestReview();
+      }
+    } catch (error) {
+      console.log('Error requesting review:', error);
+    }
+  };
+
   return (
     <View style={styles.loginContainer}>
       <Image
@@ -966,19 +978,22 @@ function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLo
       
       {isLoggedIn ? (
         <View style={styles.userInfoContainer}>
-          <Text style={styles.welcomeText}>Welcome!</Text>
           {
-            remainingAttempts === 0 ? (
-              <Text style={styles.attemptsText}> {
+            remainingAttempts <= 0 ? (
+              <Text style={[styles.attemptsText, styles.attemptsText2]}> {
                 "You've reached your daily limit. \nCome back tomorrow! 🌟"
               }
               </Text>
             ) : remainingAttempts === 1 ? (
-              <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>1</Text> attempt remaining today
-              </Text>
+              <>
+                <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>1</Text> attempt remaining</Text>
+                <Text style={[styles.attemptsText, styles.attemptsText2]}>for today 🥹</Text>
+              </>
             ) : (
-              <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>{remainingAttempts}</Text> attempts remaining today
-              </Text>
+              <>
+                <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>{remainingAttempts}</Text> attempts remaining</Text>
+                <Text style={[styles.attemptsText, styles.attemptsText2]}>for today 🥹</Text>
+              </>
             )
           }
           
@@ -987,6 +1002,13 @@ function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLo
             onPress={handleWaitlist}
           >
             <Text style={styles.waitlistButtonText}>Not enough? Join the waitlist! 🎉</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.reviewButton}
+            onPress={handleStoreReview}
+          >
+            <Text style={styles.reviewButtonText}>Love Piñata? Rate us! ⭐️</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -1071,20 +1093,12 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerTintColor: '#D43C8F',  // This sets the back button color
+          headerTintColor: '#D43C8F',
           headerBackButtonDisplayMode: 'minimal',
         }}
       >
         <Stack.Screen 
           name="Home" 
-          component={({ navigation }) => (
-            <HomeScreen 
-              navigation={navigation}
-              isLoggedIn={isLoggedIn}
-              userInfo={userInfo}
-              handleLogout={handleLogout}
-            />
-          )}
           options={{
             headerTitle: () => (
               <Image
@@ -1094,10 +1108,19 @@ export default function App() {
             ),
             headerTitleAlign: 'center',
           }}
-        />
+        >
+          {(props) => (
+            <HomeScreen 
+              {...props}
+              isLoggedIn={isLoggedIn}
+              userInfo={userInfo}
+              handleLogout={handleLogout}
+            />
+          )}
+        </Stack.Screen>
         <Stack.Screen 
           name="Result" 
-          component={ResultScreen} 
+          component={ResultScreen}
           options={{
             headerTitle: () => (
               <Image
@@ -1110,15 +1133,6 @@ export default function App() {
         />
         <Stack.Screen 
           name="Login" 
-          component={({ navigation }) => (
-            <LoginScreen 
-              navigation={navigation}
-              storeUserData={storeUserData}
-              isLoggedIn={isLoggedIn}
-              userInfo={userInfo}
-              handleLogout={handleLogout}
-            />
-          )}
           options={{
             headerTitle: () => (
               <Image
@@ -1128,7 +1142,17 @@ export default function App() {
             ),
             headerTitleAlign: 'center',
           }}
-        />
+        >
+          {(props) => (
+            <LoginScreen 
+              {...props}
+              storeUserData={storeUserData}
+              isLoggedIn={isLoggedIn}
+              userInfo={userInfo}
+              handleLogout={handleLogout}
+            />
+          )}
+        </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -1524,32 +1548,27 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logoutButton: {
-    backgroundColor: '#D43C8F',
+    backgroundColor: 'transparent',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
     elevation: 5,
-    marginTop: 50,
+    marginTop: 70,
   },
   logoutButtonText: {
-    color: 'white',
+    color: 'black',
     fontSize: 14,
     fontWeight: '600',
   },
   attemptsText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-    fontStyle: 'italic',
+    fontSize: 20,
+    // color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 30,
+  },
+  attemptsText2: {
+    marginTop: 10,
+    marginBottom: 30,
   },
   waitlistButton: {
     backgroundColor: '#7744C2',  // Different color from logout button
@@ -1567,6 +1586,28 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   waitlistButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  reviewButton: {
+    backgroundColor: '#D43C8F',  // iOS green color
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    marginTop: 10,
+  },
+  reviewButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
