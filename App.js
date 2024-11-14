@@ -1,6 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView, Dimensions, ActivityIndicator, PanResponder, Animated, Share } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView, Dimensions, ActivityIndicator, PanResponder, Animated, Share, Easing } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useState, useEffect, useRef } from 'react';
 import { OPENAI_API_KEY } from '@env';
@@ -43,7 +43,7 @@ const parseVocabularyData = (response) => {
 };
 
 // Add this new component
-function SuccessMessage({ visible, message, onHide }) {
+function SuccessMessage({ visible, message, onHide, color = 'rgba(212, 60, 143, 0.9)'}) {
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -67,7 +67,7 @@ function SuccessMessage({ visible, message, onHide }) {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.successMessage, { opacity: fadeAnim }]}>
+    <Animated.View style={[styles.successMessage, { opacity: fadeAnim, backgroundColor: color }]}>
       <Text style={styles.successMessageText}>{message}</Text>
     </Animated.View>
   );
@@ -75,6 +75,25 @@ function SuccessMessage({ visible, message, onHide }) {
 
 // Home Screen Component
 function HomeScreen({ navigation }) {
+
+  const [showMessage, setShowMessage] = useState(false);
+  
+  const validateImageDimensions = (width, height) => {
+    const aspectRatio = height / width;
+    const MAX_RATIO = 16 / 9;
+    const MIN_RATIO = 9 / 16;
+
+    if (aspectRatio > MAX_RATIO) {
+      console.log('Image is too tall 📏');
+      return false;
+    }
+    if (aspectRatio < MIN_RATIO) {
+      console.log('Image is too wide 📏');
+      return false;
+    }
+    return true;
+  };
+
   const pickImage = async () => {
     try {
       // Request permission
@@ -91,6 +110,11 @@ function HomeScreen({ navigation }) {
         quality: 1,
         base64: true,
       });
+
+      if (!validateImageDimensions(result.assets[0].width, result.assets[0].height)) {
+        setShowMessage(true);
+        return;
+      }
 
       if (!result.canceled) {
         // Navigate to result screen with base64 data
@@ -153,6 +177,12 @@ function HomeScreen({ navigation }) {
       >
         <Text style={styles.buttonText}>Take Photo</Text>
       </TouchableOpacity>
+      <SuccessMessage 
+        visible={showMessage}
+        message={"Oh no! The image either too tall or too wide, please try again with a different image."}
+        onHide={() => setShowMessage(false)}
+        color={'red'}
+      />
     </View>
   );
 }
@@ -221,32 +251,36 @@ function ResultScreen({ route, navigation }) {
 
                     4. **Word types**:
                       - Include the type of the word, for example "verb", "noun", "adjective", "adverb", etc.
+
+                    5. **Pronunciation**:
+                      - include the pronunciation of the word, for example if the word is "perro", the pronunciation should be "peh-rroh", and if the word is "comer", the pronunciation should be "ko-meh-reh".
                       
-                    5. **Word Locations**:
+                    6. **Word Locations**:
                       - Provide each word's **location as a percentage** of the image dimensions, in the format "[x%, y%]", where "x" and "y" are percentages relative to the image width and height, respectively.
                       - Ensure that locations do not overlap. Each word should have a **10% width and 5% height area** for placement, avoiding overlaps if possible.
+                      - Try to be as accurate as possible with the location of the words, but if they overlap, try to be as close as possible to the location provided.
                     
-                    6. **Example Sentence of Keywords**: 
+                    7. **Example Sentence of Keywords**: 
                       - Include a sentence that includes the keyword, for example if the keyword is "perro", the sentence could be "El perro feo corre en el patio grande". Try not to use the conjugations of the word in the sentence.
                       - Also include the english translation of the sentence, for example "The ugly dog runs in the big yard", better to use the word translated in #2 in the sentence.
 
-                    7. **Response Format**:
+                    8. **Response Format**:
                       - Structure your response in "<vocabulary>" tags with each entry as a JSON object.
                       - Use this format:
                         <vocabulary>
-                          {"type": "description", "wordType": "noun", "spanish": "perro", "engli ssh":"dog", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
-                          {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
+                          {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "pronunciation": "peh-rroh", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
+                          {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "pronunciation": "ko-meh-reh", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
                         </vocabulary>
 
                     ### Example Response:
                     If the image depicts a dog in a park:
                     <vocabulary> 
-                      {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
-                      {"type": "description", "wordType": "noun", "spanish": "césped", "english": "grass", "wordConjugation": "[céspedes]", "sentence": "El césped es verde", "translation": "The grass is green", "location": ["22.4%", "24%"]} 
-                      {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
-                      {"type": "description", "wordType": "noun", "spanish": "alegría", "english": "happy", "wordConjugation": "[alegrias]", "sentence": "La alegria es intensa", "translation": "The joy is intense", "location": ["42%", "37.4%"]} 
-                      {"type": "atmosphere", "wordType": "adjective", "spanish": "soleado", "english": "sunny", "wordConjugation": "[soleada, soledad, soledades]", "sentence": "El día está soleado", "translation": "The day is sunny", "location": ["50%", "10%"]} 
-                      {"type": "atmosphere", "wordType": "noun", "spanish": "delicioso", "english": "delightful", "wordConjugation": "[deliciosa, deliciosos, deliciosas]", "sentence": "Olamos nosotros ese delicioso pastel", "translation": "We eat that delicious cake", "location": ["60%", "15%"]} 
+                      {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "pronunciation": "peh-rroh", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
+                      {"type": "description", "wordType": "noun", "spanish": "césped", "english": "grass", "pronunciation": "seh-peh-deh", "wordConjugation": "[céspedes]", "sentence": "El césped es verde", "translation": "The grass is green", "location": ["22.4%", "24%"]} 
+                      {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "pronunciation": "ko-meh-reh", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
+                      {"type": "description", "wordType": "noun", "spanish": "alegría", "english": "happy", "pronunciation": "ah-leh-gria", "wordConjugation": "[alegrias]", "sentence": "La alegria es intensa", "translation": "The joy is intense", "location": ["42%", "37.4%"]} 
+                      {"type": "atmosphere", "wordType": "adjective", "spanish": "soleado", "english": "sunny", "pronunciation": "soh-leh-dah", "wordConjugation": "[soleada, soledad, soledades]", "sentence": "El día está soleado", "translation": "The day is sunny", "location": ["50%", "10%"]} 
+                      {"type": "atmosphere", "wordType": "noun", "spanish": "delicioso", "english": "delightful", "pronunciation": "deh-lee-choh-soh", "wordConjugation": "[deliciosa, deliciosos, deliciosas]", "sentence": "Olamos nosotros ese delicioso pastel", "translation": "We eat that delicious cake", "location": ["60%", "15%"]} 
                     </vocabulary>`}
               ]
             }
@@ -259,9 +293,6 @@ function ResultScreen({ route, navigation }) {
       const data = await result.json();
       if (data.choices && data.choices.length > 0) {
         const response = data.choices[0].message.content;
-        console.log('ChatGPT response:', response);
-        setGptResponse(response);
-        
         // Parse the vocabulary data
         const parsedData = parseVocabularyData(response);
         if (parsedData) {
@@ -278,28 +309,27 @@ function ResultScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    // callChatGPT();
-    const response = `
-        <vocabulary> 
-          {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
-          {"type": "description", "wordType": "noun", "spanish": "césped", "english": "grass", "wordConjugation": "[céspedes]", "sentence": "El césped es verde", "translation": "The grass is green", "location": ["22.4%", "24%"]} 
-          {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
-          {"type": "description", "wordType": "noun", "spanish": "alegría", "english": "happy", "wordConjugation": "[alegrias]", "sentence": "La alegria es intensa", "translation": "The joy is intense", "location": ["42%", "37.4%"]} 
-          {"type": "atmosphere", "wordType": "adjective", "spanish": "soleado", "english": "sunny", "wordConjugation": "[soleada, soledad, soledades]", "sentence": "El día está soleado", "translation": "The day is sunny", "location": ["50%", "10%"]} 
-          {"type": "atmosphere", "wordType": "noun", "spanish": "delicioso", "english": "delightful", "wordConjugation": "[deliciosas]", "sentence": "Olamos nosotros ese delicioso pastel", "translation": "We eat that delicious cake", "location": ["60%", "15%"]} 
-        </vocabulary>
-    `;
-    const parsedData = parseVocabularyData(response);
-    if (parsedData) {
-      setVocabularyData(parsedData);
-    }
-    setLoading(false);
+    callChatGPT();
+    // const response = `
+    //     <vocabulary> 
+    //       {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
+    //       {"type": "description", "wordType": "noun", "spanish": "césped", "english": "grass", "wordConjugation": "[céspedes]", "sentence": "El césped es verde", "translation": "The grass is green", "location": ["22.4%", "24%"]} 
+    //       {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
+    //       {"type": "description", "wordType": "noun", "spanish": "alegría", "english": "happy", "wordConjugation": "[alegrias]", "sentence": "La alegria es intensa", "translation": "The joy is intense", "location": ["42%", "37.4%"]} 
+    //       {"type": "atmosphere", "wordType": "adjective", "spanish": "soleado", "english": "sunny", "wordConjugation": "[soleada, soledad, soledades]", "sentence": "El día está soleado", "translation": "The day is sunny", "location": ["50%", "10%"]} 
+    //       {"type": "atmosphere", "wordType": "noun", "spanish": "delicioso", "english": "delightful", "wordConjugation": "[deliciosas]", "sentence": "Olamos nosotros ese delicioso pastel", "translation": "We eat that delicious cake", "location": ["60%", "15%"]} 
+    //     </vocabulary>
+    // `;
+    // const parsedData = parseVocabularyData(response);
+    // if (parsedData) {
+    //   setVocabularyData(parsedData);
+    // }
+    // setLoading(false);
   }, [imageBase64, imageUri]);
 
   useEffect(() => {
-    if (vocabularyData) {
+    if (vocabularyData && markers.length === 0) {  // Only initialize if markers are empty
       setZIndexOrder(vocabularyData.map((_, index) => index));
-      // Initialize markers with position and pan animation
       const newMarkers = vocabularyData.map((item) => ({
         ...item,
         pan: new Animated.ValueXY(),
@@ -307,7 +337,7 @@ function ResultScreen({ route, navigation }) {
       }));
       setMarkers(newMarkers);
     }
-  }, [vocabularyData, imageWidth, imageHeight]);
+  }, [vocabularyData]);  // Remove imageWidth and imageHeight from dependencies
 
   const bringToFront = (index) => {
     setZIndexOrder(prevOrder => {
@@ -372,7 +402,7 @@ function ResultScreen({ route, navigation }) {
         );
         const newY = Math.min(
           Math.max(30, marker.position.top + gesture.dy),
-          imageHeight - 30
+          imageHeight - 50
         );
         
         // Create new markers array with updated position
@@ -482,174 +512,235 @@ function ResultScreen({ route, navigation }) {
     }
   };
 
-  // Add this function to handle deletion
+  // Update handleDeleteWord to handle both markers and vocabularyData
   const handleDeleteWord = (indexToDelete) => {
+    // Keep the current positions of remaining markers
     setMarkers(prevMarkers => prevMarkers.filter((_, index) => index !== indexToDelete));
     setVocabularyData(prevData => prevData.filter((_, index) => index !== indexToDelete));
-    setZIndexOrder(prevOrder => prevOrder.filter(index => index !== indexToDelete)
+    setZIndexOrder(prevOrder => prevOrder
+      .filter(index => index !== indexToDelete)
       .map(index => index > indexToDelete ? index - 1 : index));
+    setSelectedMarker(null);
+  };
+
+  // Add this near the top with other imports
+  const LoadingIndicator = () => {
+    const rotation = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      const animate = () => {
+        Animated.loop(
+          Animated.timing(rotation, {
+            toValue: 1,
+            duration: 2000,  // Increased duration for smoother animation
+            useNativeDriver: true,
+            easing: Easing.bezier(0.45, 0, 0.55, 1),  // Using bezier curve for smoother movement
+          }),
+          {
+            iterations: -1,
+          }
+        ).start();
+      };
+
+      animate();
+      
+      return () => {
+        rotation.stopAnimation();
+      };
+    }, []);
+
+    const spin = rotation.interpolate({
+      inputRange: [0, 0.5, 1],  // Three points for smoother interpolation
+      outputRange: ['0deg', '10deg', '0deg'],  // Return to center position
+      extrapolate: 'clamp'
+    });
+
+    return (
+      <View style={styles.loadingContainer}>
+        <Animated.Image
+          source={require('./assets/loading.png')}
+          style={[
+            styles.loadingImage,
+            { transform: [{ rotate: spin }] }
+          ]}
+        />
+      </View>
+    );
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.scrollView} 
-        scrollEnabled={!isDragging && !isEditMode}  // Disable scroll in edit mode
-      >
-        <ViewShot 
-          ref={viewShotRef}
-          options={{ 
-            format: "jpg", 
-            quality: 0.8,
-          }}
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      {loading ? (
+        <View style={styles.loadingScreen}>
+          <LoadingIndicator />
+          <Text style={styles.loadingText}>Let's see what you can learn </Text> 
+          <Text style={styles.loadingText}>from this picture! 🧐</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.scrollView} 
+          scrollEnabled={!isDragging && !isEditMode}
         >
-          <View style={styles.imageContainer}>
-            <Image 
-              source={{ uri: imageUri }}
-              style={[styles.image, { height: imageHeight }]}
-            />
-            {markers.map((item, index) => {
-              const panResponder = createPanResponder(index);
-              return (
-                <Animated.View 
-                  key={index}
-                  {...panResponder.panHandlers}
-                  style={[
-                    styles.vocabularyMarker,
-                    {
-                      left: item.position.left,
-                      top: item.position.top,
-                      zIndex: zIndexOrder.indexOf(index) + 1,
-                      elevation: zIndexOrder.indexOf(index) + 1,
-                      transform: [
-                        { translateX: item.pan.x },
-                        { translateY: item.pan.y },
-                        { translateX: -50 },
-                        { translateY: -30 }
-                      ]
-                    }
-                  ]}
+          <ViewShot 
+            ref={viewShotRef}
+            options={{ 
+              format: "jpg", 
+              quality: 0.8,
+            }}
+          >
+            <View style={styles.imageContainer}>
+              <Image 
+                source={{ uri: imageUri }}
+                style={[styles.image, { height: imageHeight }]}
+              />
+              {markers.map((item, index) => {
+                const panResponder = createPanResponder(index);
+                return (
+                  <Animated.View 
+                    key={index}
+                    {...panResponder.panHandlers}
+                    style={[
+                      styles.vocabularyMarker,
+                      {
+                        left: item.position.left,
+                        top: item.position.top,
+                        zIndex: zIndexOrder.indexOf(index) + 1,
+                        elevation: zIndexOrder.indexOf(index) + 1,
+                        transform: [
+                          { translateX: item.pan.x },
+                          { translateY: item.pan.y },
+                          { translateX: -50 },
+                          { translateY: -30 }
+                        ]
+                      }
+                    ]}
+                  >
+                    {!isCapturing && selectedMarker === index && (  // Only show delete button for selected marker
+                      <TouchableOpacity 
+                        style={styles.deleteButton}
+                        onPress={() => {
+                          handleDeleteWord(index);
+                          setSelectedMarker(null);  // Clear selection after delete
+                        }}
+                      >
+                        <Text style={styles.deleteButtonText}>×</Text>
+                      </TouchableOpacity>
+                    )}
+                    <View style={styles.markerContent}>
+                      {item.type === 'atmosphere' && <Text style={styles.vocabularyType}>Theme</Text>}
+                      <Text style={styles.vocabularyWord}>{item.spanish}</Text>
+                      <Text style={styles.grayText}>{item.english}</Text>
+                    </View>
+                  </Animated.View>
+                );
+              })}
+              <Animated.View 
+                style={[
+                  styles.editButton,
+                  isEditMode && styles.editButtonActive,
+                  { opacity: isCapturing || loading ? 0 : 1 }
+                ]}
+              >
+                <TouchableOpacity 
+                  onPress={handleEditModeToggle}
                 >
-                  {!isCapturing && selectedMarker === index && (  // Only show delete button for selected marker
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => {
-                        handleDeleteWord(index);
-                        setSelectedMarker(null);  // Clear selection after delete
-                      }}
-                    >
-                      <Text style={styles.deleteButtonText}>×</Text>
-                    </TouchableOpacity>
-                  )}
-                  <View style={styles.markerContent}>
-                    {item.type === 'atmosphere' && <Text style={styles.vocabularyType}>Theme</Text>}
-                    <Text style={styles.vocabularyWord}>{item.spanish}</Text>
-                    <Text style={styles.grayText}>{item.english}</Text>
-                  </View>
-                </Animated.View>
-              );
-            })}
-            <Animated.View 
-              style={[
-                styles.editButton,
-                isEditMode && styles.editButtonActive,
-                { opacity: isCapturing || loading ? 0 : 1 }
-              ]}
-            >
-              <TouchableOpacity 
-                onPress={handleEditModeToggle}
-              >
-                <Text style={styles.editButtonText}>
-                  {isEditMode ? 'Done' : 'Arrange Tags'}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
+                  <Text style={styles.editButtonText}>
+                    {isEditMode ? 'Done' : 'Arrange Tags'}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
 
-            <Animated.View 
-              style={[
-                styles.saveButton,
-                { opacity: isCapturing || isEditMode || loading ? 0 : 1 }
-              ]}
-            >
-              <TouchableOpacity 
-                onPress={handleSave}
+              <Animated.View 
+                style={[
+                  styles.saveButton,
+                  { opacity: isCapturing || isEditMode || loading ? 0 : 1 }
+                ]}
               >
-                <Text style={styles.editButtonText}>
-                  Save Image
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-          <View style={styles.gptContainer}>
-            {loading ? (
-              <ActivityIndicator size="large" color="#007AFF" style={{ padding: 20 }}/>
-            ) : vocabularyData && vocabularyData.length > 0 ? (
-              <View style={styles.vocabularyContainer}>
-                {vocabularyData.map((item, index) => (
-                  <View key={index} style={styles.vocabularyItem}>
-                    <Text style={styles.vocabularyText}>
-                      <Text style={[styles.vocabularyText, styles.mainText]}>{item.spanish}</Text>
-                      <Text style={[styles.vocabularyText, styles.regularText]}> - {item.english}</Text>
-                      <Text style={[styles.vocabularyText, styles.smallText]}> ({item.wordType})</Text>
-                    </Text>
-                    <Text style={styles.vocabularyText}>
-                    {item.wordConjugation
-                      .map((conjugation, i) => (
-                        i === 0 ? (
-                          <Text key={i} style={styles.conjugationText}>
-                            {conjugation}
-                          </Text>
-                        ) : (
-                          <Text key={i} style={styles.conjugationText}>
-                            {' '}/ {conjugation}
-                          </Text>
-                        )
-                      ))
-                    }
-                    </Text>
-                    <Text>
-                    <Text style={styles.vocabularyText}>
-                      e.g. {
-                        item.sentence.split(new RegExp(`(${[item.spanish, ...item.wordConjugation].join('|')})`, 'gi'))
-                        .map((part, i) => (
-                          [item.spanish, ...item.wordConjugation].some(word => 
-                            word.toLowerCase() === part.toLowerCase()
+                <TouchableOpacity 
+                  onPress={handleSave}
+                >
+                  <Text style={styles.editButtonText}>
+                    Save Image
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+            <View style={styles.gptContainer}>
+              {loading ? (
+                <LoadingIndicator />
+              ) : vocabularyData && vocabularyData.length > 0 ? (
+                <View style={styles.vocabularyContainer}>
+                  {isEditMode && <View style={styles.overlay} />}
+                  {vocabularyData.map((item, index) => (
+                    <View key={index} style={styles.vocabularyItem}>
+                      <Text style={styles.vocabularyText}>
+                        <Text style={[styles.vocabularyText, styles.mainText]}>{item.spanish}</Text>
+                        <Text style={[styles.vocabularyText, styles.regularText]}> - {item.english}</Text>
+                        <Text style={[styles.vocabularyText, styles.smallText]}> ({item.wordType})</Text>
+                      </Text>
+                      <Text style={[styles.vocabularyText, styles.smallText]}>{item.pronunciation}</Text>
+                      <Text style={styles.vocabularyText}>
+                      {item.wordConjugation
+                        .map((conjugation, i) => (
+                          i === 0 ? (
+                            <Text key={i} style={styles.conjugationText}>
+                              {conjugation}
+                            </Text>
+                          ) : (
+                            <Text key={i} style={styles.conjugationText}>
+                              {' '}/ {conjugation}
+                            </Text>
                           )
-                            ? <Text key={i} style={styles.boldText}>{part}</Text>
-                            : part
                         ))
                       }
-                    </Text>
-                    <Text style={[styles.vocabularyText, styles.conjugationText]}>
-                      {' ('}{
-                        item.translation.split(new RegExp(`(${item.english})`, 'gi'))
-                        .map((part, i) => (
-                          part.toLowerCase() === item.english.toLowerCase()
-                            ? <Text key={i} style={styles.boldText}>{part}</Text>
-                            : part
-                        ))
-                      }{')'}
-                    </Text>
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.noVocabularyText}>Opps! No words found {'\n'}Can you give me one more chance? 🥺</Text>
-            )}
-          </View>
-          {isCapturing && (  // Only show header when capturing
-            <View style={styles.captureHeader}>
-              <Text style={styles.captureHeaderText}>Created by </Text>
-              <Image
-                source={logoFull}
-                style={styles.captureHeaderLogo}
-              />
+                      </Text>
+                      <Text>
+                      <Text style={styles.vocabularyText}>
+                        e.g. {
+                          item.sentence.split(new RegExp(`(${[item.spanish, ...item.wordConjugation].join('|')})`, 'gi'))
+                          .map((part, i) => (
+                            [item.spanish, ...item.wordConjugation].some(word => 
+                              word.toLowerCase() === part.toLowerCase()
+                            )
+                              ? <Text key={i} style={styles.boldText}>{part}</Text>
+                              : part
+                          ))
+                        }
+                      </Text>
+                      <Text style={[styles.vocabularyText, styles.conjugationText]}>
+                        {' ('}{
+                          item.translation.split(new RegExp(`(${item.english})`, 'gi'))
+                          .map((part, i) => (
+                            part.toLowerCase() === item.english.toLowerCase()
+                              ? <Text key={i} style={styles.boldText}>{part}</Text>
+                              : part
+                          ))
+                        }{')'}
+                      </Text>
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.noVocabularyContainer}>
+                  <Text style={styles.noVocabularyText}>Oops! No words found </Text>
+                  <Text style={styles.noVocabularyText}>Can you give me one more chance? 🥺</Text>
+                </View>
+              )}
             </View>
-          )}
-        </ViewShot>
-      </ScrollView>
+            {isCapturing && (  // Only show header when capturing
+              <View style={styles.captureHeader}>
+                <Text style={styles.captureHeaderText}>Created by </Text>
+                <Image
+                  source={logoFull}
+                  style={styles.captureHeaderLogo}
+                />
+              </View>
+            )}
+          </ViewShot>
+        </ScrollView>
+      )}
       <SuccessMessage 
         visible={showSuccess}
         message="Yay! Image is saved! 🤩"
@@ -879,6 +970,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     elevation: 5,
+    zIndex: 100,
   },
   saveButton: {
     position: 'absolute',
@@ -891,14 +983,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     elevation: 5,
+    zIndex: 100,
   },
   editButtonActive: {
-    backgroundColor: 'rgba(212, 60, 143, 0.7)', // Pink with transparency
+    backgroundColor: 'rgba(212, 60, 143, 0.9)', // Pink with transparency
   },
   editButtonText: {
     color: 'white',
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 14,
+    paddingVertical: 2,
   },
   successMessage: {
     position: 'absolute',
@@ -946,6 +1040,41 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#666',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 10,
+  },
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingImage: {
+    width: 120,  // Made slightly larger
+    height: 120,  // Made slightly larger
+    resizeMode: 'contain',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 10,
+    paddingHorizontal: 20,
+    textAlign: 'center',
+  },
+  noVocabularyContainer: {
+    marginTop: 10,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(128, 128, 128, 0.5)',  // Semi-transparent gray
+    zIndex: 1,
   },
 });
