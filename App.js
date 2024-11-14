@@ -9,9 +9,16 @@ import * as MediaLibrary from 'expo-media-library';
 import logo from './assets/logo.png';
 import logoFull from './assets/logofull.png';
 import { useFonts } from 'expo-font';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
 
 const Stack = createNativeStackNavigator();
 const screenWidth = Dimensions.get('window').width;
+
+// Add these constants at the top of the file
+const DAILY_LIMIT = 10;
+const STORAGE_KEY = 'dailyUsage';
 
 // Add this interface at the top of the file
 const parseVocabularyData = (response) => {
@@ -44,7 +51,7 @@ const parseVocabularyData = (response) => {
 };
 
 // Add this new component
-function SuccessMessage({ visible, message, onHide, color = 'rgba(212, 60, 143, 0.9)'}) {
+function SuccessMessage({ visible, message, onHide}) {
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -68,14 +75,106 @@ function SuccessMessage({ visible, message, onHide, color = 'rgba(212, 60, 143, 
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.successMessage, { opacity: fadeAnim, backgroundColor: color }]}>
+    <Animated.View style={[styles.successMessage, { opacity: fadeAnim, backgroundColor: '#7744C2' }]}>
       <Text style={styles.successMessageText}>{message}</Text>
     </Animated.View>
   );
 }
 
+// Add these functions to handle daily limit
+const checkDailyLimit = async () => {
+  try {
+    const today = new Date().toDateString();
+    const usageData = await AsyncStorage.getItem(STORAGE_KEY);
+    
+    if (usageData) {
+      const { date, count } = JSON.parse(usageData);
+      
+      // If it's a new day, reset the count
+      if (date !== today) {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
+          date: today,
+          count: 0
+        }));
+        return { canProceed: true, remainingAttempts: DAILY_LIMIT };
+      }
+      
+      // Check if limit is reached
+      if (count >= DAILY_LIMIT) {
+        return { canProceed: false, remainingAttempts: 0 };
+      }
+      
+      return { canProceed: true, remainingAttempts: DAILY_LIMIT - count };
+    }
+    
+    // First time usage
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
+      date: today,
+      count: 0
+    }));
+    return { canProceed: true, remainingAttempts: DAILY_LIMIT };
+  } catch (error) {
+    console.error('Error checking daily limit:', error);
+    return { canProceed: false, remainingAttempts: 0 };
+  }
+};
+
+const incrementUsageCount = async () => {
+  try {
+    const today = new Date().toDateString();
+    const usageData = await AsyncStorage.getItem(STORAGE_KEY);
+    
+    if (usageData) {
+      const { count } = JSON.parse(usageData);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
+        date: today,
+        count: count + 1
+      }));
+    }
+  } catch (error) {
+    console.error('Error incrementing usage count:', error);
+  }
+};
+
 // Home Screen Component
-function HomeScreen({ navigation }) {
+function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
+  const [remainingAttempts, setRemainingAttempts] = useState(DAILY_LIMIT);
+  const [showLimitMessage, setShowLimitMessage] = useState(false);
+
+  // Update useEffect to also run when screen comes into focus
+  useEffect(() => {
+    const checkAttempts = async () => {
+      const { remainingAttempts } = await checkDailyLimit();
+      setRemainingAttempts(remainingAttempts);
+    };
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      checkAttempts();
+    });
+
+    // Initial check
+    checkAttempts();
+
+    // Cleanup subscription
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity 
+          onPress={() => {
+              navigation.navigate('Login', { isLoggedIn: isLoggedIn, userInfo: userInfo, handleLogout: handleLogout });
+          }}
+        >
+          <Image 
+            source={require('./assets/settings.png')}
+            style={{ width: 25, height: 25 }}
+          />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, isLoggedIn, userInfo]);
 
   const [showMessage, setShowMessage] = useState(false);
   
@@ -158,6 +257,42 @@ function HomeScreen({ navigation }) {
     }
   };
 
+  const handleImageAction = async () => {
+    if (!isLoggedIn) {
+      navigation.navigate('Login');
+      return;
+    }
+
+    const { canProceed, remainingAttempts: attempts } = await checkDailyLimit();
+    setRemainingAttempts(attempts);
+
+    if (!canProceed) {
+      setShowLimitMessage(true);
+      return;
+    }
+
+    await incrementUsageCount();
+    pickImage();
+  };
+
+  const handleCameraAction = async () => {
+    if (!isLoggedIn) {
+      navigation.navigate('Login');
+      return;
+    }
+
+    const { canProceed, remainingAttempts: attempts } = await checkDailyLimit();
+    setRemainingAttempts(attempts);
+
+    if (!canProceed) {
+      setShowLimitMessage(true);
+      return;
+    }
+
+    await incrementUsageCount();
+    takePhoto();
+  };
+
   return (
     <View style={styles.container}>
       <Image
@@ -172,11 +307,11 @@ function HomeScreen({ navigation }) {
       </Text>
       <TouchableOpacity 
         style={[styles.button, styles.libraryButton]}
-        onPress={pickImage}
+        onPress={handleImageAction}
       >
         <View style={styles.buttonContent}>
           <Image 
-            source={require('./assets/image.png')}  // Make sure to add this icon
+            source={require('./assets/image.png')}
             style={styles.buttonIcon}
           />
           <Text style={styles.buttonText}>CHOOSE a moment</Text>
@@ -185,11 +320,11 @@ function HomeScreen({ navigation }) {
       
       <TouchableOpacity 
         style={[styles.button, styles.cameraButton]}
-        onPress={takePhoto}
+        onPress={handleCameraAction}
       >
         <View style={styles.buttonContent}>
           <Image 
-            source={require('./assets/camera.png')}  // Make sure to add this icon
+            source={require('./assets/camera.png')}
             style={styles.buttonIcon}
           />
           <Text style={styles.buttonText}>CAPTURE a moment</Text>
@@ -200,6 +335,11 @@ function HomeScreen({ navigation }) {
         message={"Oh no! The image either too tall or too wide, please try again with a different image."}
         onHide={() => setShowMessage(false)}
         color={'red'}
+      />
+      <SuccessMessage 
+        visible={showLimitMessage}
+        message="You've reached your daily limit. Come back tomorrow! 🌟"
+        onHide={() => setShowLimitMessage(false)}
       />
     </View>
   );
@@ -493,7 +633,7 @@ function ResultScreen({ route, navigation }) {
       // Share the image
       await Share.share({
         url: result,
-        message: 'Check out my vocabulary from Pinata!',
+        message: 'Check out my vocabulary from Piñata!',
       });
     } catch (error) {
       setIsCapturing(false);
@@ -515,14 +655,7 @@ function ResultScreen({ route, navigation }) {
             style={styles.shareIcon}
           />
         </TouchableOpacity>
-      ),
-      headerLeft: () => (
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-        >
-          <Image source={require('./assets/back.png')} style={styles.backIcon} />
-        </TouchableOpacity>
-      ),
+      )
     });
   }, [navigation, loading]);
 
@@ -776,11 +909,159 @@ function ResultScreen({ route, navigation }) {
   );
 }
 
+// Update LoginScreen component
+function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLogout }) {
+  const [remainingAttempts, setRemainingAttempts] = useState(DAILY_LIMIT);
+
+  // Add useEffect to check remaining attempts
+  useEffect(() => {
+    const checkAttempts = async () => {
+      const { remainingAttempts } = await checkDailyLimit();
+      setRemainingAttempts(remainingAttempts);
+    };
+
+    if (isLoggedIn) {
+      checkAttempts();
+    }
+  }, [isLoggedIn]);
+
+  const handleAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      
+      const userData = {
+        id: credential.user,
+        email: credential.email,
+        name: credential.fullName?.givenName,
+        provider: 'apple'
+      };
+      
+      await storeUserData(userData);
+      navigation.goBack();
+      
+    } catch (e) {
+      if (e.code === 'ERR_CANCELED') {
+        console.log('User canceled Apple Sign In');
+      } else {
+        console.error('Apple Sign In error:', e);
+      }
+    }
+  };
+
+  const handleWaitlist = async () => {
+    await WebBrowser.openBrowserAsync('https://forms.gle/JfXFTZomAyEMRCis8');
+  };
+
+  return (
+    <View style={styles.loginContainer}>
+      <Image
+        source={require('./assets/logohome.png')}
+        style={styles.loginLogo}
+      />
+      
+      {isLoggedIn ? (
+        <View style={styles.userInfoContainer}>
+          <Text style={styles.welcomeText}>Welcome!</Text>
+          {
+            remainingAttempts === 0 ? (
+              <Text style={styles.attemptsText}> {
+                "You've reached your daily limit. \nCome back tomorrow! 🌟"
+              }
+              </Text>
+            ) : remainingAttempts === 1 ? (
+              <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>1</Text> attempt remaining today
+              </Text>
+            ) : (
+              <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>{remainingAttempts}</Text> attempts remaining today
+              </Text>
+            )
+          }
+          
+          <TouchableOpacity 
+            style={styles.waitlistButton}
+            onPress={handleWaitlist}
+          >
+            <Text style={styles.waitlistButtonText}>Not enough? Join the waitlist! 🎉</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.logoutButton}
+            onPress={() => {
+              handleLogout();
+              navigation.goBack();
+            }}
+          >
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.loginTitle}>Login to start learning</Text>
+          {AppleAuthentication.isAvailableAsync() && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={12}
+              style={styles.appleButton}
+              onPress={handleAppleSignIn}
+            />
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
 // Main App Component
 export default function App() {
   const [fontsLoaded] = useFonts({
     'Pacifico': require('./assets/fonts/Pacifico-Regular.ttf'),
   });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
+
+  // Add these functions to handle login state
+  const storeUserData = async (userData) => {
+    try {
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      setUserInfo(userData);
+      setIsLoggedIn(true);
+    } catch (error) {
+      console.error('Error storing user data:', error);
+    }
+  };
+
+  const checkLoginState = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) {
+        setUserInfo(JSON.parse(userData));
+        setIsLoggedIn(true);
+      }
+    } catch (error) {
+      console.error('Error checking login state:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userData');
+      setUserInfo(null);
+      setIsLoggedIn(false);
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  // Check login state when app starts
+  useEffect(() => {
+    checkLoginState();
+  }, []);
 
   if (!fontsLoaded) {
     return <View style={{ flex: 1 }}><ActivityIndicator /></View>;
@@ -790,12 +1071,20 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerTintColor: '#7744C2',  // This sets the back button color
+          headerTintColor: '#D43C8F',  // This sets the back button color
+          headerBackButtonDisplayMode: 'minimal',
         }}
       >
         <Stack.Screen 
           name="Home" 
-          component={HomeScreen} 
+          component={({ navigation }) => (
+            <HomeScreen 
+              navigation={navigation}
+              isLoggedIn={isLoggedIn}
+              userInfo={userInfo}
+              handleLogout={handleLogout}
+            />
+          )}
           options={{
             headerTitle: () => (
               <Image
@@ -809,6 +1098,27 @@ export default function App() {
         <Stack.Screen 
           name="Result" 
           component={ResultScreen} 
+          options={{
+            headerTitle: () => (
+              <Image
+                source={logo}
+                style={{ width: 90, height: 30, resizeMode: 'contain' }}
+              />
+            ),
+            headerTitleAlign: 'center',
+          }}
+        />
+        <Stack.Screen 
+          name="Login" 
+          component={({ navigation }) => (
+            <LoginScreen 
+              navigation={navigation}
+              storeUserData={storeUserData}
+              isLoggedIn={isLoggedIn}
+              userInfo={userInfo}
+              handleLogout={handleLogout}
+            />
+          )}
           options={{
             headerTitle: () => (
               <Image
@@ -1151,5 +1461,115 @@ const styles = StyleSheet.create({
   },
   spacing: {
     height: 70,
+  },
+  loginContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginLogo: {
+    width: screenWidth * 0.5,
+    height: screenWidth * 0.5,
+    resizeMode: 'contain',
+  },
+  loginTitle: {
+    fontSize: 24,
+    fontFamily: 'Pacifico',
+    color: '#D43C8F',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    width: '100%',
+  },
+  loginButtonIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
+    marginTop: 10,
+  },
+  userInfoContainer: {
+    alignItems: 'center',
+    padding: 20,
+    width: '100%',
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontFamily: 'Pacifico',
+    color: '#D43C8F',
+    marginBottom: 10,
+  },
+  emailText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 30,
+  },
+  logoutButton: {
+    backgroundColor: '#D43C8F',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    marginTop: 50,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  attemptsText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  waitlistButton: {
+    backgroundColor: '#7744C2',  // Different color from logout button
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 15,  // Space between waitlist and logout buttons
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  waitlistButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
