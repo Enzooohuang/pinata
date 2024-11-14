@@ -163,18 +163,36 @@ function HomeScreen({ navigation }) {
         source={require('./assets/logohome.png')}
         style={styles.homeLogo}
       />
+      <Text style={styles.taglineText}>
+        Turn any moment into
+      </Text>
+      <Text style={[styles.taglineText, styles.taglineText2]}>
+        a Spanish learning opportunity! 🎉
+      </Text>
       <TouchableOpacity 
         style={[styles.button, styles.libraryButton]}
         onPress={pickImage}
       >
-        <Text style={styles.buttonText}>Select from Library</Text>
+        <View style={styles.buttonContent}>
+          <Image 
+            source={require('./assets/image.png')}  // Make sure to add this icon
+            style={styles.buttonIcon}
+          />
+          <Text style={styles.buttonText}>CHOOSE a moment</Text>
+        </View>
       </TouchableOpacity>
       
       <TouchableOpacity 
         style={[styles.button, styles.cameraButton]}
         onPress={takePhoto}
       >
-        <Text style={styles.buttonText}>Take Photo</Text>
+        <View style={styles.buttonContent}>
+          <Image 
+            source={require('./assets/camera.png')}  // Make sure to add this icon
+            style={styles.buttonIcon}
+          />
+          <Text style={styles.buttonText}>CAPTURE a moment</Text>
+        </View>
       </TouchableOpacity>
       <SuccessMessage 
         visible={showMessage}
@@ -487,18 +505,25 @@ function ResultScreen({ route, navigation }) {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity 
+        loading ? <></> : <TouchableOpacity 
           onPress={captureAndShare}
           style={styles.shareButton}
         >
           <Image 
             source={require('./assets/share.png')}  // Make sure to add a share icon to your assets
-            style={{ width: 18, height: 20 }}
+            style={styles.shareIcon}
           />
         </TouchableOpacity>
       ),
+      headerLeft: () => (
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+        >
+          <Image source={require('./assets/back.png')} style={styles.backIcon} />
+        </TouchableOpacity>
+      ),
     });
-  }, [navigation]);
+  }, [navigation, loading]);
 
   // Add this function to handle edit mode toggle
   const handleEditModeToggle = () => {
@@ -531,7 +556,7 @@ function ResultScreen({ route, navigation }) {
         Animated.loop(
           Animated.timing(rotation, {
             toValue: 1,
-            duration: 2000,  // Increased duration for smoother animation
+            duration: 1500,  // Increased duration for smoother animation
             useNativeDriver: true,
             easing: Easing.bezier(0.45, 0, 0.55, 1),  // Using bezier curve for smoother movement
           }),
@@ -550,7 +575,7 @@ function ResultScreen({ route, navigation }) {
 
     const spin = rotation.interpolate({
       inputRange: [0, 0.5, 1],  // Three points for smoother interpolation
-      outputRange: ['0deg', '10deg', '0deg'],  // Return to center position
+      outputRange: ['-5deg', '15deg', '-5deg'],  // Return to center position
       extrapolate: 'clamp'
     });
 
@@ -573,172 +598,173 @@ function ResultScreen({ route, navigation }) {
         <View style={styles.loadingScreen}>
           <LoadingIndicator />
           <Text style={styles.loadingText}>Let's see what you can learn </Text> 
-          <Text style={styles.loadingText}>from this picture! 🧐</Text>
+          <Text style={styles.loadingText}>from this moment! 🧐</Text>
         </View>
       ) : (
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.scrollView} 
-          scrollEnabled={!isDragging && !isEditMode}
-        >
-          <ViewShot 
-            ref={viewShotRef}
-            options={{ 
-              format: "jpg", 
-              quality: 0.8,
-            }}
+        <>
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.scrollView} 
+            scrollEnabled={!isDragging && !isEditMode}
           >
-            <View style={styles.imageContainer}>
-              <Image 
-                source={{ uri: imageUri }}
-                style={[styles.image, { height: imageHeight }]}
-              />
-              {markers.map((item, index) => {
-                const panResponder = createPanResponder(index);
-                return (
-                  <Animated.View 
-                    key={index}
-                    {...panResponder.panHandlers}
-                    style={[
-                      styles.vocabularyMarker,
-                      {
-                        left: item.position.left,
-                        top: item.position.top,
-                        zIndex: zIndexOrder.indexOf(index) + 1,
-                        elevation: zIndexOrder.indexOf(index) + 1,
-                        transform: [
-                          { translateX: item.pan.x },
-                          { translateY: item.pan.y },
-                          { translateX: -50 },
-                          { translateY: -30 }
-                        ]
-                      }
-                    ]}
+            <ViewShot 
+              ref={viewShotRef}
+              options={{ 
+                format: "jpg", 
+                quality: 0.8,
+              }}
+            >
+              <View style={styles.imageContainer}>
+                <Image 
+                  source={{ uri: imageUri }}
+                  style={[styles.image, { height: imageHeight }]}
+                />
+                {markers.map((item, index) => {
+                  const panResponder = createPanResponder(index);
+                  return (
+                    <Animated.View 
+                      key={index}
+                      {...panResponder.panHandlers}
+                      style={[
+                        styles.vocabularyMarker,
+                        {
+                          left: item.position.left,
+                          top: item.position.top,
+                          zIndex: zIndexOrder.indexOf(index) + 1,
+                          elevation: zIndexOrder.indexOf(index) + 1,
+                          transform: [
+                            { translateX: item.pan.x },
+                            { translateY: item.pan.y },
+                            { translateX: -50 },
+                            { translateY: -30 }
+                          ]
+                        }
+                      ]}
+                    >
+                      {!isCapturing && selectedMarker === index && (  // Only show delete button for selected marker
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => {
+                            handleDeleteWord(index);
+                            setSelectedMarker(null);  // Clear selection after delete
+                          }}
+                        >
+                          <Text style={styles.deleteButtonText}>×</Text>
+                        </TouchableOpacity>
+                      )}
+                      <View style={styles.markerContent}>
+                        {item.type === 'atmosphere' && <Text style={styles.vocabularyType}>Theme</Text>}
+                        <Text style={styles.vocabularyWord}>{item.spanish}</Text>
+                        <Text style={styles.grayText}>{item.english}</Text>
+                      </View>
+                    </Animated.View>
+                  );
+                })}
+                <Animated.View 
+                  style={[
+                    styles.editButton,
+                    isEditMode && styles.editButtonActive,
+                    { opacity: isCapturing || loading ? 0 : 1 }
+                  ]}
+                >
+                  <TouchableOpacity 
+                    onPress={handleEditModeToggle}
                   >
-                    {!isCapturing && selectedMarker === index && (  // Only show delete button for selected marker
-                      <TouchableOpacity 
-                        style={styles.deleteButton}
-                        onPress={() => {
-                          handleDeleteWord(index);
-                          setSelectedMarker(null);  // Clear selection after delete
-                        }}
-                      >
-                        <Text style={styles.deleteButtonText}>×</Text>
-                      </TouchableOpacity>
-                    )}
-                    <View style={styles.markerContent}>
-                      {item.type === 'atmosphere' && <Text style={styles.vocabularyType}>Theme</Text>}
-                      <Text style={styles.vocabularyWord}>{item.spanish}</Text>
-                      <Text style={styles.grayText}>{item.english}</Text>
-                    </View>
-                  </Animated.View>
-                );
-              })}
-              <Animated.View 
-                style={[
-                  styles.editButton,
-                  isEditMode && styles.editButtonActive,
-                  { opacity: isCapturing || loading ? 0 : 1 }
-                ]}
-              >
-                <TouchableOpacity 
-                  onPress={handleEditModeToggle}
-                >
-                  <Text style={styles.editButtonText}>
-                    {isEditMode ? 'Done' : 'Arrange Tags'}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Animated.View 
-                style={[
-                  styles.saveButton,
-                  { opacity: isCapturing || isEditMode || loading ? 0 : 1 }
-                ]}
-              >
-                <TouchableOpacity 
-                  onPress={handleSave}
-                >
-                  <Text style={styles.editButtonText}>
-                    Save Image
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-            <View style={styles.gptContainer}>
-              {loading ? (
-                <LoadingIndicator />
-              ) : vocabularyData && vocabularyData.length > 0 ? (
-                <View style={styles.vocabularyContainer}>
-                  {isEditMode && <View style={styles.overlay} />}
-                  {vocabularyData.map((item, index) => (
-                    <View key={index} style={styles.vocabularyItem}>
-                      <Text style={styles.vocabularyText}>
-                        <Text style={[styles.vocabularyText, styles.mainText]}>{item.spanish}</Text>
-                        <Text style={[styles.vocabularyText, styles.regularText]}> - {item.english}</Text>
-                        <Text style={[styles.vocabularyText, styles.smallText]}> ({item.wordType})</Text>
-                      </Text>
-                      <Text style={[styles.vocabularyText, styles.smallText]}>{item.pronunciation}</Text>
-                      <Text style={styles.vocabularyText}>
-                      {item.wordConjugation
-                        .map((conjugation, i) => (
-                          i === 0 ? (
-                            <Text key={i} style={styles.conjugationText}>
-                              {conjugation}
-                            </Text>
-                          ) : (
-                            <Text key={i} style={styles.conjugationText}>
-                              {' '}/ {conjugation}
-                            </Text>
-                          )
-                        ))
-                      }
-                      </Text>
-                      <Text>
-                      <Text style={styles.vocabularyText}>
-                        e.g. {
-                          item.sentence.split(new RegExp(`(${[item.spanish, ...item.wordConjugation].join('|')})`, 'gi'))
-                          .map((part, i) => (
-                            [item.spanish, ...item.wordConjugation].some(word => 
-                              word.toLowerCase() === part.toLowerCase()
+                    <Text style={styles.editButtonText}>
+                      {isEditMode ? 'Done' : 'Arrange Tags'}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+              <View style={styles.gptContainer}>
+                {loading ? (
+                  <LoadingIndicator />
+                ) : vocabularyData && vocabularyData.length > 0 ? (
+                  <View style={styles.vocabularyContainer}>
+                    {isEditMode && <View style={styles.overlay} />}
+                    {vocabularyData.map((item, index) => (
+                      <View key={index} style={styles.vocabularyItem}>
+                        <Text style={styles.vocabularyText}>
+                          <Text style={[styles.vocabularyText, styles.mainText]}>{item.spanish}</Text>
+                          <Text style={[styles.vocabularyText, styles.regularText]}> - {item.english}</Text>
+                          <Text style={[styles.vocabularyText, styles.smallText]}> ({item.wordType})</Text>
+                        </Text>
+                        <Text style={[styles.vocabularyText, styles.smallText]}>{item.pronunciation}</Text>
+                        <Text style={styles.vocabularyText}>
+                        {item.wordConjugation
+                          .map((conjugation, i) => (
+                            i === 0 ? (
+                              <Text key={i} style={styles.conjugationText}>
+                                {conjugation}
+                              </Text>
+                            ) : (
+                              <Text key={i} style={styles.conjugationText}>
+                                {' '}/ {conjugation}
+                              </Text>
                             )
-                              ? <Text key={i} style={styles.boldText}>{part}</Text>
-                              : part
                           ))
                         }
-                      </Text>
-                      <Text style={[styles.vocabularyText, styles.conjugationText]}>
-                        {' ('}{
-                          item.translation.split(new RegExp(`(${item.english})`, 'gi'))
-                          .map((part, i) => (
-                            part.toLowerCase() === item.english.toLowerCase()
-                              ? <Text key={i} style={styles.boldText}>{part}</Text>
-                              : part
-                          ))
-                        }{')'}
-                      </Text>
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View style={styles.noVocabularyContainer}>
-                  <Text style={styles.noVocabularyText}>Oops! No words found </Text>
-                  <Text style={styles.noVocabularyText}>Can you give me one more chance? 🥺</Text>
+                        </Text>
+                        <Text>
+                        <Text style={styles.vocabularyText}>
+                          e.g. {
+                            item.sentence.split(new RegExp(`(${[item.spanish, ...item.wordConjugation].join('|')})`, 'gi'))
+                            .map((part, i) => (
+                              [item.spanish, ...item.wordConjugation].some(word => 
+                                word.toLowerCase() === part.toLowerCase()
+                              )
+                                ? <Text key={i} style={styles.boldText}>{part}</Text>
+                                : part
+                            ))
+                          }
+                        </Text>
+                        <Text style={[styles.vocabularyText, styles.conjugationText]}>
+                          {' ('}{
+                            item.translation.split(new RegExp(`(${item.english})`, 'gi'))
+                            .map((part, i) => (
+                              part.toLowerCase() === item.english.toLowerCase()
+                                ? <Text key={i} style={styles.boldText}>{part}</Text>
+                                : part
+                            ))
+                          }{')'}
+                        </Text>
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.noVocabularyContainer}>
+                    <Text style={styles.noVocabularyText}>Oops! No words found </Text>
+                    <Text style={styles.noVocabularyText}>Can you give me one more chance? 🥺</Text>
+                  </View>
+                )}
+              </View>
+              {isCapturing && (  // Only show header when capturing
+                <View style={styles.captureHeader}>
+                  <Text style={styles.captureHeaderText}>Created by </Text>
+                  <Image
+                    source={logoFull}
+                    style={styles.captureHeaderLogo}
+                  />
                 </View>
               )}
-            </View>
-            {isCapturing && (  // Only show header when capturing
-              <View style={styles.captureHeader}>
-                <Text style={styles.captureHeaderText}>Created by </Text>
-                <Image
-                  source={logoFull}
-                  style={styles.captureHeaderLogo}
-                />
-              </View>
-            )}
-          </ViewShot>
-        </ScrollView>
+            </ViewShot>
+            <View style={styles.spacing}></View>
+          </ScrollView>
+          
+          <Animated.View 
+            style={[
+              styles.saveButton,
+              { opacity: isCapturing || isEditMode || loading ? 0 : 1 }
+            ]}
+          >
+            <TouchableOpacity onPress={handleSave}>
+              <Text style={styles.editButtonText}>
+                Save as Image
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </>
       )}
       <SuccessMessage 
         visible={showSuccess}
@@ -795,7 +821,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-    gap: 20,
+    gap: 10,
     backgroundColor: '#fff',  // Ensure white background
   },
   scrollView: {
@@ -808,6 +834,7 @@ const styles = StyleSheet.create({
   },
   libraryButton: {
     backgroundColor: '#7744C2',
+    marginBottom: 10,
   },
   cameraButton: {
     backgroundColor: '#D43C8F',
@@ -935,7 +962,7 @@ const styles = StyleSheet.create({
     width: screenWidth * 0.7,  // 70% of screen width
     height: screenWidth * 0.7,  // Maintain aspect ratio
     resizeMode: 'contain',
-    marginBottom: 40,  // Space between logo and buttons
+    // marginBottom: 10,  // Space between logo and buttons
   },
   captureHeader: {
     backgroundColor: '#fff',
@@ -961,7 +988,7 @@ const styles = StyleSheet.create({
   editButton: {
     position: 'absolute',
     bottom: 10,
-    left: 10,
+    right: 10,
     backgroundColor: 'rgba(119, 68, 194, 0.7)', // Purple with transparency
     paddingHorizontal: 15,
     paddingVertical: 8,
@@ -973,29 +1000,36 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(212, 60, 143, 0.7)', // Purple with transparency
+    bottom: 30,  // Increased bottom margin
+    right: 20,
+    backgroundColor: 'rgba(212, 60, 143, 0.7)',
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
-    zIndex: 100,
+    zIndex: 1000,
   },
   editButtonActive: {
     backgroundColor: 'rgba(212, 60, 143, 0.9)', // Pink with transparency
   },
   editButtonText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: '500',
     fontSize: 14,
     paddingVertical: 2,
   },
   successMessage: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 80,
     left: 20,
     right: 20,
     backgroundColor: 'rgba(212, 60, 143, 0.9)',
@@ -1009,8 +1043,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  shareButton: {
-    color: '#7744C2',
+  backIcon: {
+    width: 25,
+    height: 25,
+    resizeMode: 'contain',
+  },
+  shareIcon: {
+    width: 25,
+    height: 25,
+    resizeMode: 'contain',
   },
   deleteButton: {
     position: 'absolute',
@@ -1037,7 +1078,7 @@ const styles = StyleSheet.create({
   noVocabularyText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#D43C8F',
     textAlign: 'center',
     marginTop: 10,
   },
@@ -1052,20 +1093,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingImage: {
-    width: 120,  // Made slightly larger
-    height: 120,  // Made slightly larger
+    width: 150,  // Made slightly larger
+    height: 150,  // Made slightly larger
     resizeMode: 'contain',
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#D43C8F',
     marginTop: 10,
     paddingHorizontal: 20,
     textAlign: 'center',
+    fontFamily: 'Pacifico',
   },
   noVocabularyContainer: {
-    marginTop: 10,
+    marginTop: 20,
   },
   overlay: {
     position: 'absolute',
@@ -1075,5 +1117,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(128, 128, 128, 0.5)',  // Semi-transparent gray
     zIndex: 1,
+  },
+  taglineText: {
+    fontSize: 20,
+    color: '#D43C8F',
+    textAlign: 'center',
+    fontFamily: 'Pacifico',
+    paddingHorizontal: 20,
+    lineHeight: 30,
+  },
+  taglineText2: {
+    marginBottom: 20,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonIcon: {
+    width: 24,
+    height:  21,
+    marginRight: 10,
+    tintColor: 'white',  // This will make the icons white
+  },
+  spacing: {
+    height: 70,
   },
 });
