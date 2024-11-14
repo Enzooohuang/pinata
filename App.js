@@ -8,6 +8,7 @@ import ViewShot from "react-native-view-shot";
 import * as MediaLibrary from 'expo-media-library';
 import logo from './assets/logo.png';
 import logoFull from './assets/logofull.png';
+import { useFonts } from 'expo-font';
 
 const Stack = createNativeStackNavigator();
 const screenWidth = Dimensions.get('window').width;
@@ -777,6 +778,14 @@ function ResultScreen({ route, navigation }) {
 
 // Main App Component
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Pacifico': require('./assets/fonts/Pacifico-Regular.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1 }}><ActivityIndicator /></View>;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
