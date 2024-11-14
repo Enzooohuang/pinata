@@ -111,12 +111,11 @@ function HomeScreen({ navigation }) {
         base64: true,
       });
 
-      if (!validateImageDimensions(result.assets[0].width, result.assets[0].height)) {
-        setShowMessage(true);
-        return;
-      }
-
       if (!result.canceled) {
+        if (!validateImageDimensions(result.assets[0].width, result.assets[0].height)) {
+          setShowMessage(true);
+          return;
+        }
         // Navigate to result screen with base64 data
         navigation.navigate('Result', { 
           imageBase64: result.assets[0].base64,
