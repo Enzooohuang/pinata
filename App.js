@@ -38,10 +38,40 @@ const parseVocabularyData = (response) => {
     }
     return null;
   } catch (error) {
-    console.error('Error parsing vocabulary data:', error);
-    return null;
+    return [];
   }
 };
+
+// Add this new component
+function SuccessMessage({ visible, message, onHide }) {
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    if (visible) {
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.delay(2000),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => onHide());
+    }
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.successMessage, { opacity: fadeAnim }]}>
+      <Text style={styles.successMessageText}>{message}</Text>
+    </Animated.View>
+  );
+}
 
 // Home Screen Component
 function HomeScreen({ navigation }) {
@@ -140,6 +170,10 @@ function ResultScreen({ route, navigation }) {
   const [isDragging, setIsDragging] = useState(false);  // Add this state
   const viewShotRef = useRef();
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);  // Add this state
+  const scrollViewRef = useRef();  // Add this ref for ScrollView
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [selectedMarker, setSelectedMarker] = useState(null);  // Add this state
 
   useEffect(() => {
     Image.getSize(imageUri, (width, height) => {
@@ -174,7 +208,7 @@ function ResultScreen({ route, navigation }) {
                     Please follow these instructions:
 
                     1. **Vocabulary Extraction**: 
-                      - Identify the most relevant vocabulary words based on visible objects, actions, or key elements in the image. Examples might include words like "perro", "césped", or "alegría" if the image depicts a dog in a park.
+                      - Identify the 7 most relevant vocabulary words based on visible objects, actions, or key elements in the image. Examples might include words like "perro", "césped", or "alegría" if the image depicts a dog in a park.
                       - Include two words that convey the overall mood or atmosphere of the image, such as "soleado" or "tranquilo".
 
                     2. **Word translations**:
@@ -307,14 +341,28 @@ function ResultScreen({ route, navigation }) {
 
   const createPanResponder = (index) => {
     return PanResponder.create({
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        if (!isEditMode) return false;
+        const { dx, dy } = gesture;
+        return Math.abs(dx) > 2 || Math.abs(dy) > 2;
+      },
       onPanResponderGrant: () => {
-        setIsDragging(true);
+        // Set selected marker on tap
+        if (selectedMarker !== index) {
+          setSelectedMarker(index);
+        } else {
+          setSelectedMarker(null);
+        }
         bringToFront(index);
+        
+        if (isEditMode) {
+          setIsDragging(true);
+        }
       },
       onPanResponderMove: (_, gesture) => {
+        if (!isEditMode) return; // Don't move if not in edit mode
 
-        setIsDragging(true);
         const marker = markers[index];
         
         // Calculate new position including the transform offset
@@ -334,36 +382,62 @@ function ResultScreen({ route, navigation }) {
               ...m,
               position: { left: newX, top: newY }
             };
-            // Important: Create a new Animated.ValueXY for the updated marker
             updatedMarker.pan = new Animated.ValueXY();
             return updatedMarker;
           }
           return m;
         });
         
-        // Update markers state with the new array
         setMarkers(newMarkers);
       },
-      onPanResponderEnd: (_, gesture) => {
-        setIsDragging(false);
+      onPanResponderEnd: () => {
+        if (isEditMode) {
+          setIsDragging(false);
+        }
       },
       onPanResponderTerminate: () => {
-        setIsDragging(false);
+        if (isEditMode) {
+          setIsDragging(false);
+        }
       }
     });
+  };
+
+  const handleSave = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need media library permissions to save the image.');
+        return;
+      }
+
+      setIsCapturing(true);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const result = await viewShotRef.current.capture({
+        format: "jpg",
+        quality: 0.8,
+      });
+      await MediaLibrary.saveToLibraryAsync(result);
+      setIsCapturing(false);
+      setShowSuccess(true);  // Show success message instead of alert
+    } catch (error) {
+      setIsCapturing(false);
+      console.error('Error saving image:', error);
+      alert('Failed to save image.');
+    }
   };
 
   const captureAndShare = async () => {
     try {
       setIsCapturing(true);  // Show header before capture
       
-      // Wait a moment for the header to render
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait longer for the header and logo to render properly
+      await new Promise(resolve => setTimeout(resolve, 500));  // Increased from 100 to 500ms
       
       // Capture the view
       const result = await viewShotRef.current.capture({
         format: "jpg",
-        quality: 0.8,
+        quality: 0.8, // Add this to ensure consistent results
       });
 
       setIsCapturing(false);  // Hide header after capture
@@ -374,7 +448,7 @@ function ResultScreen({ route, navigation }) {
         message: 'Check out my vocabulary from Pinata!',
       });
     } catch (error) {
-      setIsCapturing(false);  // Make sure to hide header if there's an error
+      setIsCapturing(false);
       console.error('Error sharing image:', error);
       alert('Failed to share image.');
     }
@@ -386,7 +460,7 @@ function ResultScreen({ route, navigation }) {
       headerRight: () => (
         <TouchableOpacity 
           onPress={captureAndShare}
-          style={{ marginRight: 15 }}
+          style={styles.shareButton}
         >
           <Image 
             source={require('./assets/share.png')}  // Make sure to add a share icon to your assets
@@ -397,11 +471,31 @@ function ResultScreen({ route, navigation }) {
     });
   }, [navigation]);
 
+  // Add this function to handle edit mode toggle
+  const handleEditModeToggle = () => {
+    const newEditMode = !isEditMode;
+    setIsEditMode(newEditMode);
+    
+    // If entering edit mode, scroll to top
+    if (newEditMode) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  // Add this function to handle deletion
+  const handleDeleteWord = (indexToDelete) => {
+    setMarkers(prevMarkers => prevMarkers.filter((_, index) => index !== indexToDelete));
+    setVocabularyData(prevData => prevData.filter((_, index) => index !== indexToDelete));
+    setZIndexOrder(prevOrder => prevOrder.filter(index => index !== indexToDelete)
+      .map(index => index > indexToDelete ? index - 1 : index));
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView 
+        ref={scrollViewRef}
         style={styles.scrollView} 
-        scrollEnabled={!isDragging}
+        scrollEnabled={!isDragging && !isEditMode}  // Disable scroll in edit mode
       >
         <ViewShot 
           ref={viewShotRef}
@@ -437,13 +531,55 @@ function ResultScreen({ route, navigation }) {
                     }
                   ]}
                 >
+                  {!isCapturing && selectedMarker === index && (  // Only show delete button for selected marker
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => {
+                        handleDeleteWord(index);
+                        setSelectedMarker(null);  // Clear selection after delete
+                      }}
+                    >
+                      <Text style={styles.deleteButtonText}>×</Text>
+                    </TouchableOpacity>
+                  )}
                   <View style={styles.markerContent}>
+                    {item.type === 'atmosphere' && <Text style={styles.vocabularyType}>Theme</Text>}
                     <Text style={styles.vocabularyWord}>{item.spanish}</Text>
-                    <Text style={styles.vocabularyType}>{item.english}</Text>
+                    <Text style={styles.grayText}>{item.english}</Text>
                   </View>
                 </Animated.View>
               );
             })}
+            <Animated.View 
+              style={[
+                styles.editButton,
+                isEditMode && styles.editButtonActive,
+                { opacity: isCapturing || loading ? 0 : 1 }
+              ]}
+            >
+              <TouchableOpacity 
+                onPress={handleEditModeToggle}
+              >
+                <Text style={styles.editButtonText}>
+                  {isEditMode ? 'Done' : 'Arrange Tags'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View 
+              style={[
+                styles.saveButton,
+                { opacity: isCapturing || isEditMode || loading ? 0 : 1 }
+              ]}
+            >
+              <TouchableOpacity 
+                onPress={handleSave}
+              >
+                <Text style={styles.editButtonText}>
+                  Save Image
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
           <View style={styles.gptContainer}>
             {loading ? (
@@ -500,7 +636,7 @@ function ResultScreen({ route, navigation }) {
                 ))}
               </View>
             ) : (
-              <Text style={styles.errorText}>Could not parse vocabulary data</Text>
+              <Text style={styles.noVocabularyText}>Opps! No words found {'\n'}Can you give me one more chance? 🥺</Text>
             )}
           </View>
           {isCapturing && (  // Only show header when capturing
@@ -514,6 +650,11 @@ function ResultScreen({ route, navigation }) {
           )}
         </ViewShot>
       </ScrollView>
+      <SuccessMessage 
+        visible={showSuccess}
+        message="Yay! Image is saved! 🤩"
+        onHide={() => setShowSuccess(false)}
+      />
     </View>
   );
 }
@@ -522,7 +663,11 @@ function ResultScreen({ route, navigation }) {
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          headerTintColor: '#7744C2',  // This sets the back button color
+        }}
+      >
         <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
@@ -607,7 +752,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     padding: 10,
     borderRadius: 8,
-    minWidth: 100,
+    minWidth: 100,  // Fixed width instead of minWidth
+    height: 80,  // Fixed height
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -622,7 +768,9 @@ const styles = StyleSheet.create({
   },
   markerContent: {
     alignItems: 'center',
+    justifyContent: 'center',  // Center content vertically
     width: '100%',
+    height: '100%',  // Take full height of parent
   },
   vocabularyWord: {
     color: '#000',
@@ -640,6 +788,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(255, 255, 255, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    marginBottom: 4,
   },
   vocabularyContainer: {
     backgroundColor: '#fff',
@@ -663,7 +812,7 @@ const styles = StyleSheet.create({
   },
   boldText: {
     fontWeight: 'bold',
-    color: '#007AFF',  // Using iOS blue color for emphasis
+    color: '#7744C2', 
   },
   conjugationContainer: {
     marginLeft: 10,
@@ -674,6 +823,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 10,
     marginTop: 2,
+  },
+  grayText: {
+    fontSize: 14,
+    color: '#666',
   },
   mainText: {
     fontWeight: 'bold',
@@ -714,5 +867,85 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     fontStyle: 'italic',
+  },
+  editButton: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: 'rgba(119, 68, 194, 0.7)', // Purple with transparency
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    elevation: 5,
+  },
+  saveButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(212, 60, 143, 0.7)', // Purple with transparency
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    elevation: 5,
+  },
+  editButtonActive: {
+    backgroundColor: 'rgba(212, 60, 143, 0.7)', // Pink with transparency
+  },
+  editButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  successMessage: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(212, 60, 143, 0.9)',
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 5,
+  },
+  successMessageText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  shareButton: {
+    color: '#7744C2',
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(128, 128, 128, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 16,
+    lineHeight: 16,  // Match fontSize
+    textAlign: 'center',
+    fontWeight: 'bold',
+    height: 16,      // Match fontSize
+    width: 16,       // Match fontSize
+    marginTop: -1,   // Fine-tune vertical position
+  },
+  noVocabularyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
