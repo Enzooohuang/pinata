@@ -734,6 +734,7 @@ function ResultScreen({ route, navigation }) {
           <LoadingIndicator />
           <Text style={styles.loadingText}>Let's see what you can learn </Text> 
           <Text style={styles.loadingText}>from this moment! 🧐</Text>
+          <Text style={[styles.smallText, styles.loadingTextSmall]}>(may take ~15s)</Text>
         </View>
       ) : (
         <>
@@ -1301,6 +1302,9 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
   },
+  loadingTextSmall: {
+    marginTop: 10,
+  },
   homeLogo: {
     width: screenWidth * 0.7,  // 70% of screen width
     height: screenWidth * 0.7,  // Maintain aspect ratio
@@ -1442,12 +1446,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 20,
-    fontWeight: 'bold',
     color: '#D43C8F',
     marginTop: 10,
     paddingHorizontal: 20,
     textAlign: 'center',
-    fontFamily: 'Pacifico',
   },
   noVocabularyContainer: {
     marginTop: 20,
@@ -1562,9 +1564,8 @@ const styles = StyleSheet.create({
   },
   attemptsText: {
     fontSize: 20,
-    // color: '#666',
     textAlign: 'center',
-    lineHeight: 30,
+    lineHeight: 20,
   },
   attemptsText2: {
     marginTop: 10,

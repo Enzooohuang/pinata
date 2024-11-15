@@ -27,6 +27,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="your.bundle.identifier"/>
+        <data android:scheme="Piñata"/>
       </intent-filter>
     </activity>
   </application>
