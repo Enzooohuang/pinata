@@ -1,5 +1,5 @@
 const generalPrompt = (language) => `
-I have an image in base64 format. I would like a structured list of english and ${language} vocabulary sets present in the image, along with each word's location in pixels relative to the image dimensions. 
+I have an image in base64 format. I would like a structured list of english and ${language} vocabulary sets present in the image, along with each word's location in pixels relative to the image dimensions.
                   Instructions for Vocabulary Extraction and Localization
                     - Vocabulary Extraction:
                     Extract 7 relevant words that represent visible objects, actions, or themes in the image. Add 2 words for mood or atmosphere if possible.
@@ -21,6 +21,8 @@ I have an image in base64 format. I would like a structured list of english and 
                       {"type": "atmosphere", "wordType": "adjective", "word": "soleado", "english": "sunny", "pronunciation": "soh-leh-dah", "conjugations": ["soleada", "soleadas"], "sentence": "El día está soleado.", "translation": "The day is sunny.", "location": ["50%", "10%"]}
                     </vocabulary>"
                     - Adjusting Language: For ${language}, replace each vocabulary word in the example and its English translation accordingly.
-                  `;
+                    -Speed of response is important
+                    Try to return in less than 5 seconds.
+`;
 
 export default generalPrompt;

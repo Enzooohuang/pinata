@@ -27,7 +27,7 @@ const Stack = createNativeStackNavigator();
 const screenWidth = Dimensions.get('window').width;
 
 // Add these constants at the top of the file
-const DAILY_LIMIT = 100;
+const DAILY_LIMIT = 10;
 const STORAGE_KEY = 'dailyUsage';
 
 // Add this interface at the top of the file
@@ -147,13 +147,13 @@ const incrementUsageCount = async () => {
 
 // Add this near the top of your file
 const LANGUAGES = [
-  { id: 'spanish', label: 'Spanish 🇪🇸' },
-  { id: 'french', label: 'French 🇫🇷' },
-  { id: 'chinese', label: 'Chinese 🇨🇳' },
-  { id: 'japanese', label: 'Japanese 🇯🇵' },
-  { id: 'korean', label: 'Korean 🇰🇷' },
-  { id: 'italian', label: 'Italian 🇮🇹' },
-  { id: 'hindi', label: 'Hindi 🇮🇳' },
+  { id: 'spanish', label: 'Spanish' },
+  { id: 'chinese', label: 'Chinese' },
+  { id: 'hindi', label: 'Hindi' },
+  { id: 'french', label: 'French' },
+  { id: 'italian', label: 'Italian' },
+  { id: 'japanese', label: 'Japanese' },
+  { id: 'korean', label: 'Korean' },
 ];
 
 // Home Screen Component
@@ -457,6 +457,10 @@ function ResultScreen({ route, navigation }) {
 
   const callChatGPT = async () => {
     try {
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
+
       const result = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -481,21 +485,29 @@ function ResultScreen({ route, navigation }) {
           max_tokens: 1000,
           temperature: 0.5,
         }),
+        signal: controller.signal  // Add abort signal
       });
+
+      clearTimeout(timeoutId);  // Clear timeout if request succeeds
 
       const data = await result.json();
       if (data.choices && data.choices.length > 0) {
         const response = data.choices[0].message.content;
-        // Parse the vocabulary data
         const parsedData = parseVocabularyData(response);
         if (parsedData) {
           setVocabularyData(parsedData);
         }
       } else {
-        setGptResponse('No response from API.');
+        setVocabularyData([]);
       }
     } catch (error) {
-      setGptResponse('Error calling ChatGPT API: ' + error.message);
+      if (error.name === 'AbortError') {
+        console.log('Request timed out');
+        setVocabularyData([]);
+      } else {
+        console.error('Error calling ChatGPT API:', error);
+        setVocabularyData([]);
+      }
     } finally {
       setLoading(false);
     }

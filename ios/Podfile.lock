@@ -64,6 +64,8 @@ PODS:
     - Yoga
   - ExpoRandom (14.0.1):
     - ExpoModulesCore
+  - ExpoSplashScreen (0.29.11):
+    - ExpoModulesCore
   - ExpoStoreReview (8.0.0):
     - ExpoModulesCore
   - ExpoWebBrowser (14.0.1):
@@ -1932,6 +1934,7 @@ DEPENDENCIES:
   - ExpoMediaLibrary (from `../node_modules/expo-media-library/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoRandom (from `../node_modules/expo-random/ios`)
+  - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - ExpoStoreReview (from `../node_modules/expo-store-review/ios`)
   - ExpoWebBrowser (from `../node_modules/expo-web-browser/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -2051,6 +2054,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoRandom:
     :path: "../node_modules/expo-random/ios"
+  ExpoSplashScreen:
+    :path: "../node_modules/expo-splash-screen/ios"
   ExpoStoreReview:
     :path: "../node_modules/expo-store-review/ios"
   ExpoWebBrowser:
@@ -2215,6 +2220,7 @@ SPEC CHECKSUMS:
   ExpoMediaLibrary: 83f47430d5193186029bc57bae16e2130941bc83
   ExpoModulesCore: f12deb734bfa4efc1f1783eafc324c933a985a48
   ExpoRandom: 099ddce39b39ffb984b45118d031e8713e962a50
+  ExpoSplashScreen: a1c1b3a9648ab738be13fb109c42a85b32e08e5a
   ExpoStoreReview: f3439c43f13fa497cfe07d16b095f39101ed5548
   ExpoWebBrowser: f08aaf1c8a02af8a768d83793186cb6d2c69f529
   FBLazyVector: bc70dcb22ad30ce734a7cce7210791dc737e230f
@@ -2291,6 +2297,6 @@ SPEC CHECKSUMS:
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 96872ee462cfc43866ad013c8160d4ff6b85709b
 
-PODFILE CHECKSUM: 9bd219b43c9789439485192ecfc19a92bca51374
+PODFILE CHECKSUM: cf03665205baac6b7a24fa2ea405e026ff74f88e
 
 COCOAPODS: 1.16.2

@@ -41,7 +41,7 @@
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let us add vocabulary tags to your chosen photos.",
-          "cameraPermission": "The app accesses your camera to let you capture moments and to let us add vocabulary tags to your photos."
+          "cameraPermission": "The app accesses your camera to let you capture photos and to allow us to add vocabulary tags on them."
         }
       ],
       [

@@ -18,6 +18,8 @@ Instructions for Vocabulary Extraction and Localization:
   "<vocabulary>
     {"type": "description", "wordType": "noun", "word": "perro", "english":"dog", "pronunciation": "peh-rroh", "conjugations": ["perros"], "sentence": "El perro corre.", "translation": "The dog runs.", "location": ["12%", "15%"]}
     {"type": "atmosphere", "wordType": "adjective", "word": "soleado", "english": "sunny", "pronunciation": "soh-leh-dah", "conjugations": ["soleada", "soleadas"], "sentence": "El día está soleado.", "translation": "The day is sunny.", "location": ["50%", "10%"]}
-  </vocabulary>"`;
+  </vocabulary>"
+  -Speed of response is important
+  Try to return in less than 5 seconds.`;
 
 export default spanishPrompt;

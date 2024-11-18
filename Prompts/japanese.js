@@ -1,5 +1,5 @@
 const japanesePrompt = `
-I have an image in base64 format. I would like a structured list of english and japanese vocabulary sets present in the image, along with each word's location in pixels relative to the image dimensions. 
+I have an image in base64 format. I would like a structured list of english and japanese vocabulary sets present in the image, along with each word's location in pixels relative to the image dimensions. Try to return in less than 5 seconds.
                   Instructions for Vocabulary Extraction and Localization
                     - Vocabulary Extraction:
                     Extract 7 relevant words that represent visible objects, actions, or themes in the image. Add 2 words for mood or atmosphere if possible.
