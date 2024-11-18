@@ -28,6 +28,8 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="your.bundle.identifier"/>
         <data android:scheme="Piñata"/>
+        <data android:scheme="pinata"/>
+        <data android:scheme="com.pinata.learning"/>
       </intent-filter>
     </activity>
   </application>

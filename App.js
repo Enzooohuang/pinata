@@ -1,8 +1,8 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView, Dimensions, ActivityIndicator, PanResponder, Animated, Share, Easing } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView, Dimensions, ActivityIndicator, PanResponder, Animated, Share, Easing, Alert, Linking, ActionSheetIOS } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { OPENAI_API_KEY } from '@env';
 import ViewShot from "react-native-view-shot";
 import * as MediaLibrary from 'expo-media-library';
@@ -13,12 +13,21 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as StoreReview from 'expo-store-review';
+import spanishPrompt from './Prompts/spanish';
+import generalPrompt from './Prompts/general';
+import frenchPrompt from './Prompts/french';
+import chinesePrompt from './Prompts/chinese';
+import japanesePrompt from './Prompts/japanese';
+import koreanPrompt from './Prompts/korean';
+import italianPrompt from './Prompts/italian';
+import hindiPrompt from './Prompts/hindi';
+import * as SplashScreen from 'expo-splash-screen';
 
 const Stack = createNativeStackNavigator();
 const screenWidth = Dimensions.get('window').width;
 
 // Add these constants at the top of the file
-const DAILY_LIMIT = 10;
+const DAILY_LIMIT = 100;
 const STORAGE_KEY = 'dailyUsage';
 
 // Add this interface at the top of the file
@@ -29,20 +38,19 @@ const parseVocabularyData = (response) => {
       const vocabularyItems = match[1]
         .trim()
         .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
         .map(line => {
-          const cleanedLine = line.replace(/(\d+)px/g, '$1');
-          const parsedItem = JSON.parse(cleanedLine);
-          // Parse word conjugations into an array
-          if (parsedItem.wordConjugation) {
-            parsedItem.wordConjugation = parsedItem.wordConjugation
-              .replace('[', '')
-              .replace(']', '')
-              .split(', ');
+          line = line.trim();
+          if (line.length === 0) return null;
+          
+          try {
+            const parsedItem = JSON.parse(line);
+            return parsedItem;
+          } catch (e) {
+            return null;
           }
-          return parsedItem;
-        });
+        })
+        .filter(item => item !== null);
+      
       return vocabularyItems;
     }
     return null;
@@ -137,10 +145,22 @@ const incrementUsageCount = async () => {
   }
 };
 
+// Add this near the top of your file
+const LANGUAGES = [
+  { id: 'spanish', label: 'Spanish 🇪🇸' },
+  { id: 'french', label: 'French 🇫🇷' },
+  { id: 'chinese', label: 'Chinese 🇨🇳' },
+  { id: 'japanese', label: 'Japanese 🇯🇵' },
+  { id: 'korean', label: 'Korean 🇰🇷' },
+  { id: 'italian', label: 'Italian 🇮🇹' },
+  { id: 'hindi', label: 'Hindi 🇮🇳' },
+];
+
 // Home Screen Component
 function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
   const [remainingAttempts, setRemainingAttempts] = useState(DAILY_LIMIT);
   const [showLimitMessage, setShowLimitMessage] = useState(false);
+  const [language, setLanguage] = useState('spanish');
 
   // Update useEffect to also run when screen comes into focus
   useEffect(() => {
@@ -197,11 +217,22 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
 
   const pickImage = async () => {
     try {
-      // Request permission
+      // Request permission - removed config object
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
+      if (permissionResult.status === 'denied' && !permissionResult.canAskAgain) {
+        Alert.alert(
+          "Permission Required",
+          "To add vocabulary tags to your photos, Piñata needs access to your photo library. Please enable it in your device settings.",
+          [
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+            { text: "Cancel", style: "cancel" }
+          ]
+        );
+        return;
+      }
+
       if (permissionResult.status !== 'granted') {
-        alert('Sorry, we need camera roll permissions to make this work!');
         return;
       }
 
@@ -217,10 +248,13 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
           setShowMessage(true);
           return;
         }
+
+        await incrementUsageCount();
         // Navigate to result screen with base64 data
         navigation.navigate('Result', { 
           imageBase64: result.assets[0].base64,
-          imageUri: result.assets[0].uri
+          imageUri: result.assets[0].uri,
+          language: language
         });
       }
     } catch (error) {
@@ -231,11 +265,22 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
 
   const takePhoto = async () => {
     try {
-      // Request camera permission
+      // Request permission - removed config object
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      
+
+      if (cameraPermission.status === 'denied' && !cameraPermission.canAskAgain) {
+        Alert.alert(
+          "Permission Required",
+          "To add vocabulary tags to your camera photos, Piñata needs access to your camera. Please enable it in your device settings.",
+          [
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+            { text: "Cancel", style: "cancel" }
+          ]
+        );
+        return;
+      }
+
       if (cameraPermission.status !== 'granted') {
-        alert('Sorry, we need camera permissions to make this work!');
         return;
       }
 
@@ -247,9 +292,11 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
       });
 
       if (!result.canceled) {
+        await incrementUsageCount();
         navigation.navigate('Result', { 
           imageBase64: result.assets[0].base64,
-          imageUri: result.assets[0].uri
+          imageUri: result.assets[0].uri,
+          language: language
         });
       }
     } catch (error) {
@@ -271,8 +318,6 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
       setShowLimitMessage(true);
       return;
     }
-
-    await incrementUsageCount();
     pickImage();
   };
 
@@ -289,8 +334,6 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
       setShowLimitMessage(true);
       return;
     }
-
-    await incrementUsageCount();
     takePhoto();
   };
 
@@ -301,11 +344,37 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
         style={styles.homeLogo}
       />
       <Text style={styles.taglineText}>
-        Turn any moment into
+        Turn any moment into a
       </Text>
-      <Text style={[styles.taglineText, styles.taglineText2]}>
-        a Spanish learning opportunity! 🎉
-      </Text>
+      <View style={styles.languageContainer}>
+        <TouchableOpacity 
+          style={styles.languageSelector}
+          onPress={() => {
+            ActionSheetIOS.showActionSheetWithOptions(
+              {
+                options: [...LANGUAGES.map(lang => lang.label), 'Cancel'],
+                cancelButtonIndex: LANGUAGES.length,
+              },
+              (buttonIndex) => {
+                if (buttonIndex < LANGUAGES.length) {
+                  setLanguage(LANGUAGES[buttonIndex].id);
+                }
+              }
+            );
+          }}
+        >
+          <Text style={styles.languageText}>
+            {LANGUAGES.find(l => l.id === language)?.label}
+          </Text>
+          <Image 
+            source={require('./assets/dropdown.png')}  // Add a small dropdown arrow icon
+            style={styles.dropdownIcon}
+          />
+        </TouchableOpacity>
+        <Text style={[styles.taglineText, styles.taglineText2]}>
+          learning opportunity! 🎉
+        </Text>
+      </View>
       <TouchableOpacity 
         style={[styles.button, styles.libraryButton]}
         onPress={handleImageAction}
@@ -348,7 +417,7 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
 
 // Result Screen Component
 function ResultScreen({ route, navigation }) {
-  const { imageBase64, imageUri } = route.params;
+  const { imageBase64, imageUri, language } = route.params;
   const [imageHeight, setImageHeight] = useState(0);
   const [imageWidth, setImageWidth] = useState(0);
   const [gptResponse, setGptResponse] = useState('');
@@ -363,6 +432,20 @@ function ResultScreen({ route, navigation }) {
   const scrollViewRef = useRef();  // Add this ref for ScrollView
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState(null);  // Add this state
+
+  const choosePrompt = () => {
+    switch (language) {
+      case 'spanish': return spanishPrompt;
+      case 'french': return frenchPrompt;
+      case 'italian': return italianPrompt;
+      case 'chinese': return chinesePrompt;
+      case 'hindi': return hindiPrompt;
+      case 'italian': return italianPrompt;
+      case 'japanese': return japanesePrompt;
+      case 'korean': return koreanPrompt;
+      default: return generalPrompt(language);
+    }
+  }
 
   useEffect(() => {
     Image.getSize(imageUri, (width, height) => {
@@ -385,62 +468,13 @@ function ResultScreen({ route, navigation }) {
           messages: [
             {
               role: 'system',
-              content: `You are a helpful assistant that can analyze images and provide a list of vocabulary words in english and spanish.`
+              content: `You are a helpful assistant that can analyze images and provide a list of vocabulary words in english and ${language}.`
             },
             {
               role: 'user',
               content: [
                 {type: 'image_url', image_url: {url: `data:image/jpeg;base64,${imageBase64}`}},
-                {type: 'text', text: `
-                  I have an image in base64 format. I would like a structured list of english and spanish vocabulary sets present in the image, along with each word's location in pixels relative to the image dimensions.
-
-                    Please follow these instructions:
-
-                    1. **Vocabulary Extraction**: 
-                      - Identify the 7 most relevant vocabulary words based on visible objects, actions, or key elements in the image. Examples might include words like "perro", "césped", or "alegría" if the image depicts a dog in a park.
-                      - Include two words that convey the overall mood or atmosphere of the image, such as "soleado" or "tranquilo".
-
-                    2. **Word translations**:
-                      - Include the english translation of each word. For example, if the word is "perro", the translation should be "dog".
-
-                    3. **Word conjugations**:
-                      - Include the conjugation of the word in the different tenses, for example if the word is "comer", the conjugations should be "como", "comes", "comió", etc.
-                      - If the word is adjective, include the different forms of the adjective, for example if the word is "grande", the conjugations should be "grande", "grandes", "grandezas", etc.
-                      - If the word is a noun, include the different forms of the noun, for example if the word is "perro", the conjugations should be "perro", "perros", etc.
-
-                    4. **Word types**:
-                      - Include the type of the word, for example "verb", "noun", "adjective", "adverb", etc.
-
-                    5. **Pronunciation**:
-                      - include the pronunciation of the word, for example if the word is "perro", the pronunciation should be "peh-rroh", and if the word is "comer", the pronunciation should be "ko-meh-reh".
-                      
-                    6. **Word Locations**:
-                      - Provide each word's **location as a percentage** of the image dimensions, in the format "[x%, y%]", where "x" and "y" are percentages relative to the image width and height, respectively.
-                      - Ensure that locations do not overlap. Each word should have a **10% width and 5% height area** for placement, avoiding overlaps if possible.
-                      - Try to be as accurate as possible with the location of the words, but if they overlap, try to be as close as possible to the location provided.
-                    
-                    7. **Example Sentence of Keywords**: 
-                      - Include a sentence that includes the keyword, for example if the keyword is "perro", the sentence could be "El perro feo corre en el patio grande". Try not to use the conjugations of the word in the sentence.
-                      - Also include the english translation of the sentence, for example "The ugly dog runs in the big yard", better to use the word translated in #2 in the sentence.
-
-                    8. **Response Format**:
-                      - Structure your response in "<vocabulary>" tags with each entry as a JSON object.
-                      - Use this format:
-                        <vocabulary>
-                          {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "pronunciation": "peh-rroh", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
-                          {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "pronunciation": "ko-meh-reh", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
-                        </vocabulary>
-
-                    ### Example Response:
-                    If the image depicts a dog in a park:
-                    <vocabulary> 
-                      {"type": "description", "wordType": "noun", "spanish": "perro", "english":"dog", "pronunciation": "peh-rroh", "wordConjugation": "[perros]", "sentence": "El perro feo corre en el patio grande", "translation": "The ugly dog runs in the big yard", "location": ["12%", "15%"]} 
-                      {"type": "description", "wordType": "noun", "spanish": "césped", "english": "grass", "pronunciation": "seh-peh-deh", "wordConjugation": "[céspedes]", "sentence": "El césped es verde", "translation": "The grass is green", "location": ["22.4%", "24%"]} 
-                      {"type": "description", "wordType": "verb", "spanish": "correr", "english": "run", "pronunciation": "ko-meh-reh", "wordConjugation": "[comes, corrió, correrás, corre, corriendo, corremos]", "sentence": "El perro corre en el césped", "translation": "The dog runs in the grass", "location": ["30%", "25%"]} 
-                      {"type": "description", "wordType": "noun", "spanish": "alegría", "english": "happy", "pronunciation": "ah-leh-gria", "wordConjugation": "[alegrias]", "sentence": "La alegria es intensa", "translation": "The joy is intense", "location": ["42%", "37.4%"]} 
-                      {"type": "atmosphere", "wordType": "adjective", "spanish": "soleado", "english": "sunny", "pronunciation": "soh-leh-dah", "wordConjugation": "[soleada, soledad, soledades]", "sentence": "El día está soleado", "translation": "The day is sunny", "location": ["50%", "10%"]} 
-                      {"type": "atmosphere", "wordType": "noun", "spanish": "delicioso", "english": "delightful", "pronunciation": "deh-lee-choh-soh", "wordConjugation": "[deliciosa, deliciosos, deliciosas]", "sentence": "Olamos nosotros ese delicioso pastel", "translation": "We eat that delicious cake", "location": ["60%", "15%"]} 
-                    </vocabulary>`}
+                {type: 'text', text: choosePrompt()}
               ]
             }
           ],
@@ -484,7 +518,7 @@ function ResultScreen({ route, navigation }) {
     //   setVocabularyData(parsedData);
     // }
     // setLoading(false);
-  }, [imageBase64, imageUri]);
+  }, [imageBase64, imageUri, language]);
 
   useEffect(() => {
     if (vocabularyData && markers.length === 0) {  // Only initialize if markers are empty
@@ -790,7 +824,7 @@ function ResultScreen({ route, navigation }) {
                       )}
                       <View style={styles.markerContent}>
                         {item.type === 'atmosphere' && <Text style={styles.vocabularyType}>Theme</Text>}
-                        <Text style={styles.vocabularyWord}>{item.spanish}</Text>
+                        <Text style={styles.vocabularyWord}>{item.word}</Text>
                         <Text style={styles.grayText}>{item.english}</Text>
                       </View>
                     </Animated.View>
@@ -821,13 +855,13 @@ function ResultScreen({ route, navigation }) {
                     {vocabularyData.map((item, index) => (
                       <View key={index} style={styles.vocabularyItem}>
                         <Text style={styles.vocabularyText}>
-                          <Text style={[styles.vocabularyText, styles.mainText]}>{item.spanish}</Text>
+                          <Text style={[styles.vocabularyText, styles.mainText]}>{item.word}</Text>
                           <Text style={[styles.vocabularyText, styles.regularText]}> - {item.english}</Text>
                           <Text style={[styles.vocabularyText, styles.smallText]}> ({item.wordType})</Text>
                         </Text>
                         <Text style={[styles.vocabularyText, styles.smallText]}>{item.pronunciation}</Text>
                         <Text style={styles.vocabularyText}>
-                        {item.wordConjugation
+                        {item.conjugations
                           .map((conjugation, i) => (
                             i === 0 ? (
                               <Text key={i} style={styles.conjugationText}>
@@ -844,9 +878,9 @@ function ResultScreen({ route, navigation }) {
                         <Text>
                         <Text style={styles.vocabularyText}>
                           e.g. {
-                            item.sentence.split(new RegExp(`(${[item.spanish, ...item.wordConjugation].join('|')})`, 'gi'))
+                            item.sentence.split(new RegExp(`(${[item.word, ...item.conjugations].join('|')})`, 'gi'))
                             .map((part, i) => (
-                              [item.spanish, ...item.wordConjugation].some(word => 
+                              [item.word, ...item.conjugations].some(word => 
                                 word.toLowerCase() === part.toLowerCase()
                               )
                                 ? <Text key={i} style={styles.boldText}>{part}</Text>
@@ -877,11 +911,14 @@ function ResultScreen({ route, navigation }) {
               </View>
               {isCapturing && (  // Only show header when capturing
                 <View style={styles.captureHeader}>
-                  <Text style={styles.captureHeaderText}>Created by </Text>
-                  <Image
-                    source={logoFull}
-                    style={styles.captureHeaderLogo}
-                  />
+                  <View style={styles.captureHeaderRow}>
+                    <Text style={styles.captureHeaderText}>Created by </Text>
+                    <Image
+                      source={logoFull}
+                      style={styles.captureHeaderLogo}
+                    />
+                  </View>
+                  <Text style={styles.captureWebsiteText}>www.learnpinata.com</Text>
                 </View>
               )}
             </ViewShot>
@@ -1047,8 +1084,9 @@ export default function App() {
   });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  const [appIsReady, setAppIsReady] = useState(false);
 
-  // Add these functions to handle login state
+  // Add storeUserData and handleLogout functions here
   const storeUserData = async (userData) => {
     try {
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
@@ -1056,6 +1094,16 @@ export default function App() {
       setIsLoggedIn(true);
     } catch (error) {
       console.error('Error storing user data:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('userData');
+      setUserInfo(null);
+      setIsLoggedIn(false);
+    } catch (error) {
+      console.error('Error logging out:', error);
     }
   };
 
@@ -1071,91 +1119,110 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('userData');
-      setUserInfo(null);
-      setIsLoggedIn(false);
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
-  // Check login state when app starts
   useEffect(() => {
-    checkLoginState();
+    async function prepare() {
+      try {
+        await checkLoginState();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
   }, []);
 
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1 }}><ActivityIndicator /></View>;
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
+
+  if (!fontsLoaded || !appIsReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'white' }}>
+        <Image
+          source={require('./assets/splash.png')}
+          style={{
+            width: '100%',
+            height: '100%',
+            resizeMode: 'contain',
+          }}
+        />
+      </View>
+    );
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerTintColor: '#D43C8F',
-          headerBackButtonDisplayMode: 'minimal',
-        }}
-      >
-        <Stack.Screen 
-          name="Home" 
-          options={{
-            headerTitle: () => (
-              <Image
-                source={logo}
-                style={{ width: 90, height: 30, resizeMode: 'contain' }}
-              />
-            ),
-            headerTitleAlign: 'center',
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
+            headerTintColor: '#D43C8F',
+            headerBackButtonDisplayMode: 'minimal',
           }}
         >
-          {(props) => (
-            <HomeScreen 
-              {...props}
-              isLoggedIn={isLoggedIn}
-              userInfo={userInfo}
-              handleLogout={handleLogout}
-            />
-          )}
-        </Stack.Screen>
-        <Stack.Screen 
-          name="Result" 
-          component={ResultScreen}
-          options={{
-            headerTitle: () => (
-              <Image
-                source={logo}
-                style={{ width: 90, height: 30, resizeMode: 'contain' }}
+          <Stack.Screen 
+            name="Home" 
+            options={{
+              headerTitle: () => (
+                <Image
+                  source={logo}
+                  style={{ width: 90, height: 30, resizeMode: 'contain' }}
+                />
+              ),
+              headerTitleAlign: 'center',
+            }}
+          >
+            {(props) => (
+              <HomeScreen 
+                {...props}
+                isLoggedIn={isLoggedIn}
+                userInfo={userInfo}
+                handleLogout={handleLogout}
               />
-            ),
-            headerTitleAlign: 'center',
-          }}
-        />
-        <Stack.Screen 
-          name="Login" 
-          options={{
-            headerTitle: () => (
-              <Image
-                source={logo}
-                style={{ width: 90, height: 30, resizeMode: 'contain' }}
+            )}
+          </Stack.Screen>
+          <Stack.Screen 
+            name="Result" 
+            component={ResultScreen}
+            options={{
+              headerTitle: () => (
+                <Image
+                  source={logo}
+                  style={{ width: 90, height: 30, resizeMode: 'contain' }}
+                />
+              ),
+              headerTitleAlign: 'center',
+            }}
+          />
+          <Stack.Screen 
+            name="Login" 
+            options={{
+              headerTitle: () => (
+                <Image
+                  source={logo}
+                  style={{ width: 90, height: 30, resizeMode: 'contain' }}
+                />
+              ),
+              headerTitleAlign: 'center',
+            }}
+          >
+            {(props) => (
+              <LoginScreen 
+                {...props}
+                storeUserData={storeUserData}
+                isLoggedIn={isLoggedIn}
+                userInfo={userInfo}
+                handleLogout={handleLogout}
               />
-            ),
-            headerTitleAlign: 'center',
-          }}
-        >
-          {(props) => (
-            <LoginScreen 
-              {...props}
-              storeUserData={storeUserData}
-              isLoggedIn={isLoggedIn}
-              userInfo={userInfo}
-              handleLogout={handleLogout}
-            />
-          )}
-        </Stack.Screen>
-      </Stack.Navigator>
-    </NavigationContainer>
+            )}
+          </Stack.Screen>
+        </Stack.Navigator>
+      </NavigationContainer>
+    </View>
   );
 }
 
@@ -1210,11 +1277,11 @@ const styles = StyleSheet.create({
   },
   vocabularyMarker: {
     position: 'absolute',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    padding: 6,
     borderRadius: 8,
-    minWidth: 100,  // Fixed width instead of minWidth
-    height: 80,  // Fixed height
+    minWidth: 80,  // Fixed width instead of minWidth
+    minHeight: 60,  // Fixed height
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1224,7 +1291,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     backdropFilter: 'blur(5px)',
   },
   markerContent: {
@@ -1237,7 +1304,7 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
     textShadowColor: 'rgba(255, 255, 255, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -1249,7 +1316,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(255, 255, 255, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   vocabularyContainer: {
     backgroundColor: '#fff',
@@ -1316,10 +1383,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingBottom: 15,
     alignItems: 'center',
+  },
+  captureHeaderRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'transparent',
+  },
+  captureHeaderText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
   },
   captureHeaderLogo: {
     width: 150,
@@ -1327,10 +1400,12 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
     marginRight: 10,
   },
-  captureHeaderText: {
-    fontSize: 16,
+  captureWebsiteText: {
+    fontSize: 14,
     color: '#666',
     fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 5,
   },
   editButton: {
     position: 'absolute',
@@ -1613,5 +1688,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  languageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  languageSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    marginHorizontal: 5,
+  },
+  languageText: {
+    color: '#D43C8F',
+    fontSize: 20,
+    fontFamily: 'Pacifico',
+    marginRight: 5,
+  },
+  dropdownIcon: {
+    width: 14,
+    height: 8,
+    tintColor: '#D43C8F',
   },
 });

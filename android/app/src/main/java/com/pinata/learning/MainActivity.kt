@@ -1,4 +1,4 @@
-package your.bundle.identifier
+package com.pinata.learning
 
 import android.os.Build
 import android.os.Bundle

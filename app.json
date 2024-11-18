@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "pinata",
+    "name": "Piñata",
     "slug": "pinata",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/appstore.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "your.bundle.identifier",
+      "bundleIdentifier": "com.pinata.learning",
       "config": {
         "usesAppleSignIn": true
       }
@@ -30,18 +30,18 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_MEDIA_LOCATION"
       ],
-      "package": "your.bundle.identifier"
+      "package": "com.pinata.learning"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "Piñata",
+    "scheme": "pinata",
     "plugins": [
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them.",
-          "cameraPermission": "The app accesses your camera to let you take photos."
+          "photosPermission": "The app accesses your photos to let us add vocabulary tags to your chosen photos.",
+          "cameraPermission": "The app accesses your camera to let you capture moments and to let us add vocabulary tags to your photos."
         }
       ],
       [
@@ -58,7 +58,8 @@
         {
           "mode": "development"
         }
-      ]
+      ],
+      "expo-splash-screen"
     ],
     "fonts": [
       {
