@@ -459,7 +459,7 @@ function ResultScreen({ route, navigation }) {
     try {
       // Create AbortController for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds timeout
 
       const result = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -872,27 +872,26 @@ function ResultScreen({ route, navigation }) {
                           <Text style={[styles.vocabularyText, styles.smallText]}> ({item.wordType})</Text>
                         </Text>
                         <Text style={[styles.vocabularyText, styles.smallText]}>{item.pronunciation}</Text>
-                        <Text style={styles.vocabularyText}>
-                        {item.conjugations
-                          .map((conjugation, i) => (
-                            i === 0 ? (
-                              <Text key={i} style={styles.conjugationText}>
-                                {conjugation}
-                              </Text>
-                            ) : (
-                              <Text key={i} style={styles.conjugationText}>
-                                {' '}/ {conjugation}
-                              </Text>
-                            )
-                          ))
+                        {item.conjugations && <Text style={styles.vocabularyText}>
+                          {item.conjugations.map((conjugation, i) => (
+                              i === 0 ? (
+                                <Text key={i} style={styles.conjugationText}>
+                                  {conjugation}
+                                </Text>
+                              ) : (
+                                <Text key={i} style={styles.conjugationText}>
+                                  {' '}/ {conjugation}
+                                </Text>
+                              )
+                            ))}
+                          </Text>
                         }
-                        </Text>
                         <Text>
                         <Text style={styles.vocabularyText}>
                           e.g. {
-                            item.sentence.split(new RegExp(`(${[item.word, ...item.conjugations].join('|')})`, 'gi'))
+                            item.sentence.split(new RegExp(`(${[item.word, ...item.conjugations || []].join('|')})`, 'gi'))
                             .map((part, i) => (
-                              [item.word, ...item.conjugations].some(word => 
+                              [item.word, ...item.conjugations || []].some(word => 
                                 word.toLowerCase() === part.toLowerCase()
                               )
                                 ? <Text key={i} style={styles.boldText}>{part}</Text>

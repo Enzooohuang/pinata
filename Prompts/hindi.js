@@ -20,7 +20,7 @@ I have an image in base64 format. I would like a structured list of english and 
                       {"type": "description", "wordType": "noun", "word": "गाड़ी", "english":"car", "pronunciation": "ga-ri", "conjugations": ["गाड़ियाँ"], "sentence": "गाड़ी चलती है।", "translation": "The car runs.", "location": ["12%", "15%"]}
                       {"type": "atmosphere", "wordType": "adjective", "word": "बस्तर", "english": "sunny", "pronunciation": "ba-stha", "conjugations": ["बस्तरीय", "बस्तरीयता"], "sentence": "बस्तर है।", "translation": "The day is sunny.", "location": ["50%", "10%"]}
                     </vocabulary>"
-                    -Speed of response is important
+                    -Speed of response is important!
                     Try to return in less than 5 seconds.
 `;
 
