@@ -9,7 +9,6 @@ import * as MediaLibrary from 'expo-media-library';
 import logo from './assets/logo.png';
 import logoFull from './assets/logofull.png';
 import { useFonts } from 'expo-font';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 import * as StoreReview from 'expo-store-review';
@@ -157,7 +156,7 @@ const LANGUAGES = [
 ];
 
 // Home Screen Component
-function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
+function HomeScreen({ navigation }) {
   const [remainingAttempts, setRemainingAttempts] = useState(DAILY_LIMIT);
   const [showLimitMessage, setShowLimitMessage] = useState(false);
   const [language, setLanguage] = useState('spanish');
@@ -185,7 +184,7 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
       headerRight: () => (
         <TouchableOpacity 
           onPress={() => {
-              navigation.navigate('Login', { isLoggedIn: isLoggedIn, userInfo: userInfo, handleLogout: handleLogout });
+              navigation.navigate('Login');
           }}
         >
           <Image 
@@ -195,7 +194,7 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, isLoggedIn, userInfo]);
+  }, [navigation]);
 
   const [showMessage, setShowMessage] = useState(false);
   
@@ -306,10 +305,6 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
   };
 
   const handleImageAction = async () => {
-    if (!isLoggedIn) {
-      navigation.navigate('Login');
-      return;
-    }
 
     const { canProceed, remainingAttempts: attempts } = await checkDailyLimit();
     setRemainingAttempts(attempts);
@@ -322,10 +317,6 @@ function HomeScreen({ navigation, isLoggedIn, userInfo, handleLogout }) {
   };
 
   const handleCameraAction = async () => {
-    if (!isLoggedIn) {
-      navigation.navigate('Login');
-      return;
-    }
 
     const { canProceed, remainingAttempts: attempts } = await checkDailyLimit();
     setRemainingAttempts(attempts);
@@ -960,7 +951,7 @@ function ResultScreen({ route, navigation }) {
 }
 
 // Update LoginScreen component
-function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLogout }) {
+function LoginScreen({ navigation }) {
   const [remainingAttempts, setRemainingAttempts] = useState(DAILY_LIMIT);
 
   // Add useEffect to check remaining attempts
@@ -970,38 +961,9 @@ function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLo
       setRemainingAttempts(remainingAttempts);
     };
 
-    if (isLoggedIn) {
-      checkAttempts();
-    }
-  }, [isLoggedIn]);
+    checkAttempts();
+  }, [navigation]);
 
-  const handleAppleSignIn = async () => {
-    try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-      
-      const userData = {
-        id: credential.user,
-        email: credential.email,
-        name: credential.fullName?.givenName,
-        provider: 'apple'
-      };
-      
-      await storeUserData(userData);
-      navigation.goBack();
-      
-    } catch (e) {
-      if (e.code === 'ERR_CANCELED') {
-        console.log('User canceled Apple Sign In');
-      } else {
-        console.error('Apple Sign In error:', e);
-      }
-    }
-  };
 
   const handleWaitlist = async () => {
     await WebBrowser.openBrowserAsync('https://forms.gle/JfXFTZomAyEMRCis8');
@@ -1024,67 +986,41 @@ function LoginScreen({ navigation, storeUserData, isLoggedIn, userInfo, handleLo
         source={require('./assets/logohome.png')}
         style={styles.loginLogo}
       />
-      
-      {isLoggedIn ? (
-        <View style={styles.userInfoContainer}>
-          {
-            remainingAttempts <= 0 ? (
-              <Text style={[styles.attemptsText, styles.attemptsText2]}> {
-                "You've reached your daily limit. \nCome back tomorrow! 🌟"
-              }
-              </Text>
-            ) : remainingAttempts === 1 ? (
-              <>
-                <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>1</Text> attempt remaining</Text>
-                <Text style={[styles.attemptsText, styles.attemptsText2]}>for today 🥹</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>{remainingAttempts}</Text> attempts remaining</Text>
-                <Text style={[styles.attemptsText, styles.attemptsText2]}>for today 🥹</Text>
-              </>
-            )
-          }
-          
-          <TouchableOpacity 
-            style={styles.waitlistButton}
-            onPress={handleWaitlist}
-          >
-            <Text style={styles.waitlistButtonText}>Not enough? Join the waitlist! 🎉</Text>
-          </TouchableOpacity>
+      <View style={styles.userInfoContainer}>
+        {
+          remainingAttempts <= 0 ? (
+            <Text style={[styles.attemptsText, styles.attemptsText2]}> {
+              "You've reached your daily limit. \nCome back tomorrow! 🌟"
+            }
+            </Text>
+          ) : remainingAttempts === 1 ? (
+            <>
+              <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>1</Text> attempt remaining</Text>
+              <Text style={[styles.attemptsText, styles.attemptsText2]}>for today 🥹</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.attemptsText}> You have <Text style={styles.boldText}>{remainingAttempts}</Text> attempts remaining</Text>
+              <Text style={[styles.attemptsText, styles.attemptsText2]}>for today 🥹</Text>
+            </>
+          )
+        }
+        
+        <TouchableOpacity 
+          style={styles.waitlistButton}
+          onPress={handleWaitlist}
+        >
+          <Text style={styles.waitlistButtonText}>Not enough? Join the waitlist! 🎉</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.reviewButton}
-            onPress={handleStoreReview}
-          >
-            <Text style={styles.reviewButtonText}>Love Piñata? Rate us! ⭐️</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={() => {
-              handleLogout();
-              navigation.goBack();
-            }}
-          >
-            <Text style={styles.logoutButtonText}>Log Out</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          <Text style={styles.loginTitle}>Login to start learning</Text>
-          {AppleAuthentication.isAvailableAsync() && (
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-              cornerRadius={12}
-              style={styles.appleButton}
-              onPress={handleAppleSignIn}
-            />
-          )}
-        </>
-      )}
-    </View>
+        <TouchableOpacity 
+          style={styles.reviewButton}
+          onPress={handleStoreReview}
+        >
+          <Text style={styles.reviewButtonText}>Love Piñata? Rate us! ⭐️</Text>
+        </TouchableOpacity>
+      </View>
+  </View>
   );
 }
 
@@ -1093,65 +1029,14 @@ export default function App() {
   const [fontsLoaded] = useFonts({
     'Pacifico': require('./assets/fonts/Pacifico-Regular.ttf'),
   });
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInfo, setUserInfo] = useState(null);
-  const [appIsReady, setAppIsReady] = useState(false);
-
-  // Add storeUserData and handleLogout functions here
-  const storeUserData = async (userData) => {
-    try {
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      setUserInfo(userData);
-      setIsLoggedIn(true);
-    } catch (error) {
-      console.error('Error storing user data:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('userData');
-      setUserInfo(null);
-      setIsLoggedIn(false);
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
-  const checkLoginState = async () => {
-    try {
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        setUserInfo(JSON.parse(userData));
-        setIsLoggedIn(true);
-      }
-    } catch (error) {
-      console.error('Error checking login state:', error);
-    }
-  };
-
-  useEffect(() => {
-    async function prepare() {
-      try {
-        await checkLoginState();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (e) {
-        console.warn(e);
-      } finally {
-        setAppIsReady(true);
-      }
-    }
-
-    prepare();
-  }, []);
 
   const onLayoutRootView = useCallback(async () => {
-    if (appIsReady) {
+    if (fontsLoaded) {
       await SplashScreen.hideAsync();
     }
-  }, [appIsReady]);
+  }, [fontsLoaded]);
 
-  if (!fontsLoaded || !appIsReady) {
+  if (!fontsLoaded) {
     return (
       <View style={{ flex: 1, backgroundColor: 'white' }}>
         <Image
@@ -1177,6 +1062,7 @@ export default function App() {
         >
           <Stack.Screen 
             name="Home" 
+            component={HomeScreen}
             options={{
               headerTitle: () => (
                 <Image
@@ -1186,16 +1072,7 @@ export default function App() {
               ),
               headerTitleAlign: 'center',
             }}
-          >
-            {(props) => (
-              <HomeScreen 
-                {...props}
-                isLoggedIn={isLoggedIn}
-                userInfo={userInfo}
-                handleLogout={handleLogout}
-              />
-            )}
-          </Stack.Screen>
+          />
           <Stack.Screen 
             name="Result" 
             component={ResultScreen}
@@ -1211,6 +1088,7 @@ export default function App() {
           />
           <Stack.Screen 
             name="Login" 
+            component={LoginScreen}
             options={{
               headerTitle: () => (
                 <Image
@@ -1221,15 +1099,6 @@ export default function App() {
               headerTitleAlign: 'center',
             }}
           >
-            {(props) => (
-              <LoginScreen 
-                {...props}
-                storeUserData={storeUserData}
-                isLoggedIn={isLoggedIn}
-                userInfo={userInfo}
-                handleLogout={handleLogout}
-              />
-            )}
           </Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
